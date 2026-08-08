@@ -82,7 +82,7 @@ function printPayslip(emp, calc, period, co = {}) {
   <div class="hdr">
     <div style="display:flex;justify-content:space-between">
       <div>${co.company_logo ? `<img src="${co.company_logo}" style="height:36px;margin-bottom:6px;object-fit:contain"/>` : ""}
-        <div style="font-size:18px;font-weight:800">${co.company_name || "TARATEEL AL NAJAH CONSTRUCTION"}</div>
+        <div style="font-size:18px;font-weight:800">${co.company_name || "TRATEEL AL NAJAH CONSTRUCTION"}</div>
         <div style="font-size:11px;color:#94a3b8">${co.company_address || "Oman"} | ${co.company_phone || "+968 XXXX XXXX"}</div>
       </div>
       <div style="text-align:right">
@@ -111,7 +111,7 @@ function printPayslip(emp, calc, period, co = {}) {
     <div class="row"><span>Total Paid</span><span style="color:#10b981;font-weight:700">OMR ${calc.paidAmt.toFixed(3)}</span></div>
     <div class="row"><span>Balance</span><span style="color:${calc.balance > 0 ? "#f59e0b" : "#10b981"};font-weight:700">OMR ${calc.balance.toFixed(3)}</span></div>
     <div class="sig">
-      <div class="sigbox"><div style="height:48px"></div>Authorized Signature<br>${co.company_name || "TARATEEL AL NAJAH"}</div>
+      <div class="sigbox"><div style="height:48px"></div>Authorized Signature<br>${co.company_name || "TRATEEL AL NAJAH"}</div>
       <div class="sigbox"><div style="height:48px"></div>Employee Signature<br>${emp.name}</div>
     </div>
   </div>
@@ -135,7 +135,7 @@ function printReceipt(emp, payment, pr, co = {}) {
   <div class="hdr">
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>${co.company_logo ? `<img src="${co.company_logo}" style="height:40px;margin-bottom:6px;object-fit:contain"/>` : ""}
-        <div style="font-size:18px;font-weight:800">${co.company_name || "TARATEEL AL NAJAH"}</div>
+        <div style="font-size:18px;font-weight:800">${co.company_name || "TRATEEL AL NAJAH"}</div>
         <div style="font-size:11px;color:#94a3b8">${co.company_address || "Oman"}</div>
       </div>
       <div style="text-align:right">
@@ -156,7 +156,7 @@ function printReceipt(emp, payment, pr, co = {}) {
     </div>
     ${payment.notes ? `<div class="row"><span style="color:#64748b">Notes</span><span>${payment.notes}</span></div>` : ""}
     <div class="sig">
-      <div class="sigbox"><div style="height:48px"></div>Authorized Signature<br>${co.company_name || "TARATEEL AL NAJAH"}</div>
+      <div class="sigbox"><div style="height:48px"></div>Authorized Signature<br>${co.company_name || "TRATEEL AL NAJAH"}</div>
       <div class="sigbox"><div style="height:48px"></div>Employee Signature<br>${emp.name}</div>
     </div>
   </div>
