@@ -71,12 +71,15 @@ export function AdminProvider({ children }) {
         .single();
 
       if (data && data.password_hash === password) {
+        const perms = (data.role === "Admin" || !data.permissions || Object.keys(data.permissions||{}).length === 0)
+          ? FULL_PERMS
+          : data.permissions;
         const user = {
           id: data.id,
           username: data.username,
           display_name: data.display_name,
           role: data.role,
-          permissions: data.permissions || FULL_PERMS,
+          permissions: perms,
         };
         setCurrentUser(user);
         setIsAdmin(data.role === "Admin");
