@@ -96,7 +96,7 @@ export default function Reports() {
     const content = printRef.current?.innerHTML;
     const w = window.open("", "_blank");
     w.document.write(`
-      <html><head><title>Minarva Biz Report — Tarateel Al Najah Construction</title>
+      <html><head><title>Minarva Biz Report — TRATEEL AL NAJAH FOR TRADING</title>
       <style>
         body { font-family: 'Segoe UI', sans-serif; color: #1e293b; margin: 0; padding: 20px; font-size: 12px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
@@ -148,7 +148,7 @@ export default function Reports() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>TARATEEL AL NAJAH CONSTRUCTION</div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Oman | Construction & Contracting</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Oman | Trading · VAT OM1100538733</div>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Powered by Minarva Technologies ERP v1.0</div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -813,7 +813,7 @@ export default function Reports() {
 
           {/* Report Footer */}
           <div style={{ marginTop: 28, paddingTop: 14, borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94a3b8" }}>
-            <span>Minarva Biz ERP · Tarateel Al Najah Construction · Oman</span>
+            <span>Minarva Biz ERP · TRATEEL AL NAJAH FOR TRADING · Oman</span>
             <span>Generated: {new Date().toLocaleString("en-OM")}</span>
           </div>
         </div>
