@@ -126,12 +126,18 @@ export default function Subcontractors() {
 
   const addContract = async () => {
     if (!isAdmin) { setShowLogin(true); return; }
-    if (!form.name || !form.project) return;
+    if (!form.name?.trim()) { alert("Subcontractor name is required"); return; }
+    if (!form.project?.trim()) { alert("Project name is required"); return; }
     setSaving(true);
-    await supabase.from("subcontractors").insert({
-      name: form.name, specialty: form.specialty, project: form.project,
-      contract_amount: parseFloat(form.contract_amount)||0, paid: parseFloat(form.paid)||0
+    const { error } = await supabase.from("subcontractors").insert({
+      name: form.name.trim(),
+      specialty: form.specialty || "Civil Works",
+      project: form.project.trim(),
+      contract_amount: parseFloat(form.contract_amount)||0,
+      paid: parseFloat(form.paid)||0,
+      status: "Active"
     });
+    if (error) { alert("❌ Save failed: " + error.message); setSaving(false); return; }
     await loadAll(); setForm(emptyForm); setShowForm(false); setSaving(false);
   };
 
