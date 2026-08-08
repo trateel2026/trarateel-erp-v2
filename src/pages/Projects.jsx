@@ -169,7 +169,7 @@ export default function Projects() {
     await loadProjects();
   };
 
-  const filtered = projects.filter(p=>(filter==="All"||p.status===filter)&&(p.name.toLowerCase().includes(search.toLowerCase())||p.customer.toLowerCase().includes(search.toLowerCase())));
+  const filtered = projects.filter(p=>(filter==="All"||p.status===filter)&&((p.name||"").toLowerCase().includes(search.toLowerCase())||(p.customer||"").toLowerCase().includes(search.toLowerCase())));
 
   const pendingPayments = projects.flatMap(p=>(p.schedules||[]).filter(s=>s.work_completed&&parseFloat(s.received||0)<parseFloat(s.amount||0)).map(s=>({...s,projectName:p.name})));
 

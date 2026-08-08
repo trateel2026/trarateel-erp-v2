@@ -156,7 +156,7 @@ export default function CreditPurchases() {
   const filtered = purchases.filter(p => {
     const statusMatch = filterStatus === "All" || getStatus(p) === filterStatus;
     const typeMatch   = filterType   === "All" || (p.entry_type || "Materials / Supplies") === filterType;
-    const searchMatch = !searchText  || p.supplier_name.toLowerCase().includes(searchText.toLowerCase()) || (p.material||"").toLowerCase().includes(searchText.toLowerCase()) || (p.site||"").toLowerCase().includes(searchText.toLowerCase());
+    const searchMatch = !searchText  || (p.supplier_name||"").toLowerCase().includes(searchText.toLowerCase()) || (p.material||"").toLowerCase().includes(searchText.toLowerCase()) || (p.site||"").toLowerCase().includes(searchText.toLowerCase());
     return statusMatch && typeMatch && searchMatch;
   });
 

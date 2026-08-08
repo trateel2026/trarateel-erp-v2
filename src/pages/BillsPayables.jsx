@@ -485,7 +485,7 @@ export default function BillsPayables() {
   // ── Derived data ──
   const filteredSuppliers = suppliers.filter(s => {
     const catMatch = filterCat==="All" || s.category===filterCat;
-    const searchMatch = !search || s.name.toLowerCase().includes(search.toLowerCase());
+    const searchMatch = !search || (s.name||"").toLowerCase().includes(search.toLowerCase());
     return catMatch && searchMatch;
   });
 
