@@ -108,7 +108,7 @@ function AppContent() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
             <div style={{ width: 36, height: 36, background: "#3b82f6", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#fff" }}>S</div>
             <div>
-              <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: 14 }}>TARATEEL AL NAJAH</div>
+              <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: 14 }}>TRATEEL AL NAJAH</div>
               <div style={{ fontSize: 10, color: "#06b6d4", fontWeight: 600, letterSpacing: 1 }}>FOR TRADING</div>
             </div>
           </div>
