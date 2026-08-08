@@ -279,7 +279,7 @@ function EmployeeApp({ onExit }) {
         )}
 
         <div style={{ width: 72, height: 72, background: "#3b82f6", borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, fontWeight: 900, color: "#fff", marginBottom: 16, boxShadow: "0 8px 24px rgba(59,130,246,0.4)" }}>S</div>
-        <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 4 }}>TARATEEL AL NAJAH</div>
+        <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 4 }}>TRATEEL AL NAJAH</div>
         <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 32 }}>Employee Attendance App</div>
 
         <div style={{ background: "#fff", borderRadius: 20, padding: 32, width: "100%", maxWidth: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
