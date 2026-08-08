@@ -613,7 +613,7 @@ export default function Reports() {
 
           {/* CASHBOOK */}
           {activeTab === "ledger" && (()=>{
-            const cbEntries = filtLedger.filter(e => cbFilter==="All" || (cbFilter==="Credit" && e.type==="Credits (Income)") || (cbFilter==="Debit" && e.type==="Debits (Payouts)")).slice().reverse();
+            const cbEntries = filtLedger.filter(e => cbFilter==="All" || (cbFilter==="Credit" && e.type==="Credits (Income)") || (cbFilter==="Debit" && e.type==="Debits (Payouts)")).slice().sort((a,b) => (a.entry_date||"").localeCompare(b.entry_date||"") || (a.created_at||"").localeCompare(b.created_at||""));
             const cbCredits = cbEntries.filter(e=>e.type==="Credits (Income)").reduce((s,e)=>s+parseFloat(e.amount||0),0);
             const cbDebits  = cbEntries.filter(e=>e.type==="Debits (Payouts)").reduce((s,e)=>s+parseFloat(e.amount||0),0);
             let running = 0;
