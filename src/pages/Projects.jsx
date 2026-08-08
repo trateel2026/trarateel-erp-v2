@@ -79,9 +79,18 @@ export default function Projects() {
 
   const addProject = async () => {
     if(!isAdmin){setShowLogin(true);return;}
-    if(!newP.name||!newP.customer) return;
+    if(!newP.name?.trim()){alert("Project Name is required");return;}
+    if(!newP.customer?.trim()){alert("Customer Name is required");return;}
     setSaving(true);
-    await supabase.from("projects").insert({name:newP.name,customer:newP.customer,location:newP.location,sqm:parseFloat(newP.sqm)||0,amount:parseFloat(newP.amount)||0,status:newP.status});
+    const { error } = await supabase.from("projects").insert({
+      name:newP.name.trim(),
+      customer:newP.customer.trim(),
+      location:newP.location||"",
+      sqm:parseFloat(newP.sqm)||0,
+      amount:parseFloat(newP.amount)||0,
+      status:newP.status||"Active"
+    });
+    if(error){ alert("❌ Save failed: "+error.message); setSaving(false); return; }
     await loadProjects(); setNewP({name:"",customer:"",location:"",sqm:"",amount:"",status:"Active"}); setShowForm(false); setSaving(false);
   };
 
