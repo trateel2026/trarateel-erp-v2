@@ -321,7 +321,7 @@ function EmployeeApp({ onExit }) {
             ⬇ Install App
           </button>
         )}
-        <div style={{ fontSize: 12, color: "#60a5fa", marginBottom: 4 }}>Tarateel Al Najah Construction</div>
+        <div style={{ fontSize: 12, color: "#60a5fa", marginBottom: 4 }}>TRATEEL AL NAJAH FOR TRADING</div>
         <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{employee.name}</div>
         <div style={{ fontSize: 13, color: "#94a3b8" }}>{employee.role} · OMR {parseFloat(employee.daily_rate).toFixed(3)}/day</div>
       </div>
