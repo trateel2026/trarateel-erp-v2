@@ -138,7 +138,7 @@ export default function Invoices() {
         </div>
         <div style={{border:"1px solid #e2e8f0",borderRadius:12,padding:32,background:"#fff"}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:24}}>
-            <div><div style={{fontWeight:800,fontSize:20,color:"#0f172a"}}>{company.company_name||"TARATEEL AL NAJAH CONSTRUCTION"}</div><div style={{fontSize:12,color:"#64748b"}}>{company.address||"Oman"}</div>{company.phone&&<div style={{fontSize:12,color:"#64748b"}}>📞 {company.phone}</div>}{company.email&&<div style={{fontSize:12,color:"#64748b"}}>✉ {company.email}</div>}</div>
+            <div><div style={{fontWeight:800,fontSize:20,color:"#0f172a"}}>{company.company_name||"TRATEEL AL NAJAH CONSTRUCTION"}</div><div style={{fontSize:12,color:"#64748b"}}>{company.address||"Oman"}</div>{company.phone&&<div style={{fontSize:12,color:"#64748b"}}>📞 {company.phone}</div>}{company.email&&<div style={{fontSize:12,color:"#64748b"}}>✉ {company.email}</div>}</div>
             <div style={{textAlign:"right"}}><div style={{fontSize:24,fontWeight:800,color:"#6366f1"}}>{inv.type||"INVOICE"}</div><div style={{fontSize:13,color:"#64748b"}}>#{inv.invoice_number}</div><div style={{fontSize:12,color:"#64748b"}}>Date: {inv.invoice_date}</div>{inv.due_date&&<div style={{fontSize:12,color:"#64748b"}}>Due: {inv.due_date}</div>}</div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:24,padding:16,background:"#f8fafc",borderRadius:10}}>
