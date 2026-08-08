@@ -101,7 +101,7 @@ export default function Subcontractors() {
       supabase.from("subcontractors").select("*").order("name"),
       supabase.from("projects").select("id,name,customer").order("name"),
     ]);
-    setSubs(s.data||[]); setProjects(p.data||[]); setLoading(false);
+    setSubs((s.data||[]).filter(x => x.name && String(x.name).trim())); setProjects(p.data||[]); setLoading(false);
   };
 
   const loadMilestones = async (subId) => {
@@ -109,7 +109,7 @@ export default function Subcontractors() {
     setMilestones(data||[]);
   };
 
-  const contractors = [...new Set(subs.map(s=>s.name))].sort();
+  const contractors = [...new Set(subs.map(s=>s.name).filter(Boolean))].sort();
   const specialtiesFor = [...new Set(subs.filter(s=>s.name===selectedContractor).map(s=>s.specialty))];
   const worksFor = subs.filter(s=>s.name===selectedContractor && s.specialty===selectedSpecialty);
 
