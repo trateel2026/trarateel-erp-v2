@@ -85,7 +85,7 @@ export default function Settings() {
     setBackupLoading(true);
     try {
       const tables = ["projects","schedules","employees","attendance","payroll","ledger","invoices","subcontractors","sub_milestones","commissions","app_settings","salary_payments"];
-      const backup = { backup_date: new Date().toISOString(), version:"1.2", company:"Tarateel", data:{} };
+      const backup = { backup_date: new Date().toISOString(), version:"1.2", company:"Trateel", data:{} };
       for (const table of tables) {
         const { data } = await supabase.from(table).select("*");
         backup.data[table] = data||[];
