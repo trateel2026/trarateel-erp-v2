@@ -5,17 +5,17 @@ import { useAdmin } from "../context/AdminContext";
 import { ALL_PAGES, ROLE_PRESETS, FULL_PERMS } from "../context/AdminContext";
 
 const COMPANY_FIELDS = [
-  { key:"company_name", label:"Company Name (English)", placeholder:"Tarateel Al Najah Construction", col:2 },
-  { key:"company_name_ar", label:"Company Name (Arabic)", placeholder:"سيفن سيز للمقاولات الحديثة", col:2 },
-  { key:"company_address", label:"Full Address", placeholder:"Sultanate of Oman", col:2 },
+  { key:"company_name", label:"Company Name (English)", placeholder:"TRATEEL AL NAJAH FOR TRADING", col:2 },
+  { key:"company_name_ar", label:"Company Name (Arabic)", placeholder:"تراتيل النجاح للتجارة", col:2 },
+  { key:"company_address", label:"Full Address", placeholder:"Sultanate of Oman, Barka, South Al Batinah", col:2 },
   { key:"company_phone", label:"Primary Phone / WhatsApp", placeholder:"+968 XXXX XXXX" },
   { key:"company_phone2", label:"Secondary Phone", placeholder:"+968 XXXX XXXX" },
   { key:"company_email", label:"Email Address", placeholder:"info@company.om" },
   { key:"company_website", label:"Website", placeholder:"www.company.om" },
-  { key:"company_cr", label:"Commercial Registration No. (CR)", placeholder:"1234567" },
+  { key:"company_cr", label:"Commercial Registration No. (CR)", placeholder:"1350406" },
   { key:"company_license", label:"Construction License No.", placeholder:"MOH/2024/XXXX" },
-  { key:"company_tax_no", label:"Tax Registration No.", placeholder:"OM-TAX-XXXX" },
-  { key:"company_vat_no", label:"VAT Registration No.", placeholder:"OM-VAT-XXXX" },
+  { key:"company_tax_no", label:"Tax Registration No.", placeholder:"OM1100538733" },
+  { key:"company_vat_no", label:"VAT Registration No.", placeholder:"OM1100538733" },
   { key:"company_iban", label:"Bank IBAN", placeholder:"OM00 0000 0000 0000 0000 0000" },
   { key:"company_bank", label:"Bank Name & Branch", placeholder:"Bank Muscat, Barka Branch" },
 ];
@@ -159,7 +159,7 @@ export default function Settings() {
       <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr",gap:20}}>
         <div>
           {/* Company Profile */}
-          <Card title="🏢 Company Profile — Oman Civil Construction">
+          <Card title="🏢 Company Profile — TRATEEL AL NAJAH FOR TRADING">
             {/* Logo */}
             <div style={{marginBottom:16}}>
               <div style={{fontSize:12,color:"#64748b",marginBottom:8,fontWeight:500}}>Company Logo (appears on invoices, receipts, quotations)</div>
@@ -295,7 +295,7 @@ export default function Settings() {
           {/* System Info */}
           <ActivityLogCard />
           <Card title="ℹ System Information">
-            {[["Software","Minarva Biz ERP v1.0"],["Company","Tarateel Al Najah Construction"],["Database","Supabase · Singapore"],["Photo Storage","Cloudinary · 25GB"],["Hosting","Vercel"]].map(([l,v])=>(
+            {[["Software","Minarva Biz ERP v1.0"],["Company","TRATEEL AL NAJAH FOR TRADING"],["Database","Supabase · Singapore"],["Photo Storage","Cloudinary · 25GB"],["Hosting","Vercel"]].map(([l,v])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f8fafc",fontSize:12}}>
                 <span style={{color:"#64748b"}}>{l}</span>
                 <span style={{color:"#1e293b",fontWeight:600}}>{v}</span>
