@@ -50,9 +50,13 @@ export async function getBankAccounts() {
       .select("*")
       .eq("is_active", true)
       .order("account_name");
-    if (error || !data || data.length === 0) {
+    if (error) {
+      // Only fall back on real DB/connection error — NOT when table is simply empty
+      console.warn("bank_accounts query error, using fallback:", error.message);
       return FALLBACK_ACCOUNTS.map(a => ({ ...a, opening_balance: overrides[a.account_name] ?? a.opening_balance }));
     }
+    // Empty table = show no accounts (do NOT resurrect hardcoded fallbacks)
+    if (!data || data.length === 0) return [];
     // Deduplicate by account_name — keep only first occurrence of each name
     const seen = new Set();
     const unique = data.filter(a => {

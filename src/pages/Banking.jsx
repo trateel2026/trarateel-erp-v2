@@ -71,8 +71,16 @@ export default function Banking() {
 
   const deleteAccount = (id, name) => {
     if (!isAdmin) { setShowLogin(true); return; }
+    // Guard: never try to delete fallback/hardcoded string IDs
+    if (typeof id === "string" && id.startsWith("account-")) {
+      showMsg("❌ This is a temporary fallback account. Add a real account first.");
+      return;
+    }
     confirmAction(`Delete account "${name}"? This will NOT delete ledger entries.`, async () => {
-      await supabase.from("bank_accounts").delete().eq("id", id);
+      // Soft-delete: set is_active=false so fallbacks never reappear when table is empty
+      const { error } = await supabase.from("bank_accounts").update({ is_active: false }).eq("id", id);
+      if (error) showMsg("❌ " + error.message);
+      else showMsg("✅ Account removed");
       await loadAll();
     });
   };
