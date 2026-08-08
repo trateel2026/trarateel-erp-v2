@@ -151,7 +151,9 @@ function AppContent() {
           })}
         </nav>
 
-        ENGINE PROVIDER</div>
+        <div style={{ padding: "10px", borderTop: "1px solid #1e293b" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: "#475569", fontWeight: 600, letterSpacing: 1 }}>ENGINE PROVIDER</div>
             <div style={{ background: "#10b981", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4 }}>SYSTEM V1.2</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
