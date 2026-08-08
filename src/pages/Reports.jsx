@@ -147,7 +147,7 @@ export default function Reports() {
     <div className="header">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>TARATEEL AL NAJAH CONSTRUCTION</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>TRATEEL AL NAJAH CONSTRUCTION</div>
           <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Oman | Trading · VAT OM1100538733</div>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Powered by Minarva Technologies ERP v1.0</div>
         </div>
