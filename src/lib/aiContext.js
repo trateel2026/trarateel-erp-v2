@@ -159,7 +159,7 @@ export async function buildBusinessContext() {
 - REPORTS & AUDITS: Cashbook Statement (Credit/Debit + running balance) and Supplier Statement sub-tabs (All, VAT Bills, Normal, Rent, Utility, VAT Report for filing).
 - SETTINGS: company profile, users/permissions, backups, AI key.`;
 
-  return `BUSINESS DATA SNAPSHOT (as of ${today}) — Tarateel Al Najah Construction. Currency OMR (Omani Rial), 3 decimals. The salary period runs 26th to 25th.
+  return `BUSINESS DATA SNAPSHOT (as of ${today}) — TRATEEL AL NAJAH FOR TRADING. Currency OMR (Omani Rial), 3 decimals. The salary period runs 26th to 25th.
 
 === BANK ACCOUNTS ===
 ${accLines}
