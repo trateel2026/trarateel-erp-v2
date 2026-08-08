@@ -50,7 +50,16 @@ export default function Settings() {
 
   const save = async (key, value) => {
     setSaving(p => ({...p,[key]:true}));
-    await supabase.from("app_settings").upsert({ key, value, updated_at: new Date().toISOString() });
+    const { error } = await supabase.from("app_settings").upsert({ key, value }, { onConflict: "key" });
+    if (error) {
+      // Fallback if no unique on key: try update then insert
+      const { data: existing } = await supabase.from("app_settings").select("id").eq("key", key).maybeSingle();
+      if (existing) {
+        await supabase.from("app_settings").update({ value }).eq("key", key);
+      } else {
+        await supabase.from("app_settings").insert({ key, value });
+      }
+    }
     setSettings(p => ({...p,[key]:value}));
     setSaving(p => ({...p,[key]:false}));
     showMsg("✅ Saved!");
@@ -474,19 +483,19 @@ function UserManagement() {
       username: form.username.trim().toLowerCase(),
       display_name: form.display_name.trim(),
       role: form.role,
-      permissions: form.permissions,
-      is_active: true,
+      permissions: form.permissions || {},
     };
-    if (form.password) row.password = form.password;
+    // DB column is password_hash (not password)
+    if (form.password) row.password_hash = form.password;
     let error;
     if (editUser) {
       ({ error } = await supabase.from("app_users").update(row).eq("id", editUser));
     } else {
-      row.password = row.password || "changeme";
+      if (!row.password_hash) row.password_hash = "changeme";
       ({ error } = await supabase.from("app_users").insert(row));
     }
     if (error) setMsg("❌ " + error.message);
-    else { setMsg("✅ User saved!"); setShowForm(false); }
+    else { setMsg("✅ User saved!"); setShowForm(false); setForm({ username:"", display_name:"", password:"", role:"Viewer", permissions:{} }); setEditUser(null); }
     await loadUsers();
     setSaving(false);
     setTimeout(() => setMsg(""), 3000);

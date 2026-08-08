@@ -84,7 +84,8 @@ export function AdminProvider({ children }) {
         setShowLogin(false);
         sessionStorage.setItem("minarva_user", JSON.stringify(user));
         // Update last_login
-        supabase.from("app_users").update({ last_login: new Date().toISOString() }).eq("id", data.id).then(()=>{});
+        // last_login column may not exist — ignore errors
+        // supabase.from("app_users").update({ last_login: new Date().toISOString() }).eq("id", data.id);
         return true;
       }
     } catch {}

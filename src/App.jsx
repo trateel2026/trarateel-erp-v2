@@ -98,8 +98,6 @@ function AppContent() {
     }
   };
 
-  const fieldAppUrl = `${window.location.origin}/#field`;
-
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "'Segoe UI', -apple-system, sans-serif", background: "#f1f5f9", position: "relative" }}>
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} className="mobile-overlay" />}
@@ -153,30 +151,7 @@ function AppContent() {
           })}
         </nav>
 
-        {/* Field App Link — at bottom */}
-        <div style={{ padding: "0 10px 8px" }}>
-          <div style={{ padding: "10px", background: "#0f2744", borderRadius: 10, border: "1px solid #1e3a5f" }}>
-            <div style={{ fontSize: 10, color: "#475569", fontWeight: 600, letterSpacing: 1, marginBottom: 6 }}>EMPLOYEE FIELD APP</div>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>Share this link with employees for GPS attendance:</div>
-            <div style={{ background: "#1e293b", borderRadius: 6, padding: "5px 8px", fontSize: 9, color: "#60a5fa", fontFamily: "monospace", marginBottom: 6, wordBreak: "break-all" }}>
-              {fieldAppUrl}
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => { navigator.clipboard.writeText(fieldAppUrl); alert("Link copied!"); }}
-                style={{ flex: 1, background: "#1e3a5f", color: "#60a5fa", border: "1px solid #3b82f6", borderRadius: 6, padding: "5px", fontSize: 10, cursor: "pointer", fontWeight: 600 }}>
-                📋 Copy Link
-              </button>
-              <button onClick={() => setIsFieldApp(true)}
-                style={{ flex: 1, background: "#10b981", color: "#fff", border: "none", borderRadius: 6, padding: "5px", fontSize: 10, cursor: "pointer", fontWeight: 600 }}>
-                📱 Preview
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #1e293b" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <div style={{ fontSize: 10, color: "#475569" }}>ENGINE PROVIDER</div>
+        ENGINE PROVIDER</div>
             <div style={{ background: "#10b981", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4 }}>SYSTEM V1.2</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
