@@ -109,7 +109,7 @@ function AppContent() {
             <div style={{ width: 36, height: 36, background: "#3b82f6", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, color: "#fff" }}>S</div>
             <div>
               <div style={{ fontWeight: 700, color: "#f1f5f9", fontSize: 14 }}>TARATEEL AL NAJAH</div>
-              <div style={{ fontSize: 10, color: "#06b6d4", fontWeight: 600, letterSpacing: 1 }}>CONSTRUCTION</div>
+              <div style={{ fontSize: 10, color: "#06b6d4", fontWeight: 600, letterSpacing: 1 }}>FOR TRADING</div>
             </div>
           </div>
           {/* Current user info */}
@@ -172,7 +172,7 @@ function AppContent() {
               style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, color: "#64748b", fontSize: 20 }}>
               ☰
             </button>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", letterSpacing: 0.5 }}>TARATEEL AL NAJAH CONSTRUCTION</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", letterSpacing: 0.5 }}>TRATEEL AL NAJAH FOR TRADING</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b" }}>
@@ -219,7 +219,7 @@ function LoginScreen() {
         <div style={{ textAlign:"center", marginBottom:32 }}>
           <div style={{ width:56, height:56, background:"#3b82f6", borderRadius:14, display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:28, fontWeight:900, color:"#fff", marginBottom:12 }}>S</div>
           <div style={{ fontSize:26, fontWeight:900, color:"#0f172a" }}>Minarva Biz</div>
-          <div style={{ fontSize:13, color:"#64748b", marginTop:4 }}>Tarateel Al Najah Construction — ERP</div>
+          <div style={{ fontSize:13, color:"#64748b", marginTop:4 }}>TRATEEL AL NAJAH FOR TRADING — ERP</div>
         </div>
         <div style={{ marginBottom:16 }}>
           <div style={{ fontSize:12, color:"#64748b", marginBottom:6, fontWeight:500 }}>Username</div>
