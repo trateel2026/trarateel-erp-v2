@@ -27,7 +27,7 @@ if ('serviceWorker' in navigator) {
     Promise.all(regs.map(function(r) { return r.unregister(); })).then(function() {
       if ('caches' in window) {
         caches.keys().then(function(keys) { return Promise.all(keys.map(function(k) { return caches.delete(k); })); })
-          .then(function() { if (hadSW && !sessionStorage.getItem('sw-killed-v15')) { sessionStorage.setItem('sw-killed-v15','1'); window.location.reload(); } });
+          .then(function() { if (hadSW && !sessionStorage.getItem('sw-killed-v16')) { sessionStorage.setItem('sw-killed-v16','1'); window.location.reload(); } });
       }
     });
   });
