@@ -164,7 +164,7 @@ function LoginModal() {
     <div style={{ background:"#fff", borderRadius:16, padding:36, width:400, maxWidth:"90vw", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
       <div style={{ textAlign:"center", marginBottom:24 }}>
         <div style={{ fontSize:28, fontWeight:900, color:"#0f172a", marginBottom:4 }}>Minarva Biz</div>
-        <div style={{ fontSize:12, color:"#64748b" }}>Tarateel Al Najah Construction — ERP Login</div>
+        <div style={{ fontSize:12, color:"#64748b" }}>TRATEEL AL NAJAH FOR TRADING — ERP Login</div>
       </div>
       <div style={{ marginBottom:14 }}>
         <div style={{ fontSize:12, color:"#64748b", marginBottom:6, fontWeight:500 }}>Username</div>
