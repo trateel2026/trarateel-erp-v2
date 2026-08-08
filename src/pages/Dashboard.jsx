@@ -132,7 +132,7 @@ export default function Dashboard({ setPage }) {
       {/* Hero Banner */}
       <div style={{ background: "linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1e4080 100%)", borderRadius: 14, padding: "28px 32px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, right: 0, width: 300, height: "100%", background: "radial-gradient(circle at 80% 50%,rgba(59,130,246,0.15) 0%,transparent 70%)" }} />
-        <div style={{ fontSize: 10, color: "#60a5fa", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>TARATEEL AL NAJAH CONSTRUCTION OPERATIONS</div>
+        <div style={{ fontSize: 10, color: "#60a5fa", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>TRATEEL AL NAJAH FOR TRADING OPERATIONS</div>
         <div style={{ fontSize: 28, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Comprehensive Frontboard Dashboard</div>
         <div style={{ fontSize: 13, color: "#94a3b8", maxWidth: 560, marginBottom: 20 }}>Real-time visual reports of civil contracts, Omani Rial (OMR) ledgers, subcontractor commitments, payroll registers, and referral commission accounts.</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
