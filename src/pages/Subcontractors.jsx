@@ -8,6 +8,23 @@ const SPECIALTIES = ["Civil Works","Electrical Works","Plumbing Works","Plasteri
 const statusColor = { "Completed":"#10b981","In Progress":"#f59e0b","Pending":"#94a3b8","Cancelled":"#ef4444" };
 const statusBg = { "Completed":"#ecfdf5","In Progress":"#fffbeb","Pending":"#f8fafc","Cancelled":"#fef2f2" };
 
+/** Pending = contract - paid. If no contract set, return null (show "Advance / No contract"). */
+const calcPending = (contract, paid) => {
+  const c = parseFloat(contract) || 0;
+  const p = parseFloat(paid) || 0;
+  if (c <= 0) return null;
+  return c - p;
+};
+const formatPending = (contract, paid) => {
+  const pend = calcPending(contract, paid);
+  if (pend === null) {
+    const p = parseFloat(paid) || 0;
+    if (p > 0) return { text: "Advance only", sub: `Paid OMR ${p.toFixed(3)} · set contract value`, color: "#6366f1", value: null };
+    return { text: "No contract", sub: "", color: "#94a3b8", value: null };
+  }
+  return { text: `OMR ${pend.toFixed(3)}`, sub: "", color: pend > 0.001 ? "#f59e0b" : "#10b981", value: pend };
+};
+
 function MilestoneGraph({ milestones, type, title }) {
   const total = milestones.reduce((s,m) => s + parseFloat(m.amount||0), 0);
   const done = milestones.filter(m => m.status==="Completed").reduce((s,m) => s + parseFloat(m.amount||0), 0);
@@ -355,7 +372,7 @@ export default function Subcontractors() {
                  </div>
                  <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:8 }}>
                    <span style={{ color:"#10b981",fontWeight:600 }}>Paid: OMR {st.paid.toFixed(3)}</span>
-                   <span style={{ color:"#f59e0b",fontWeight:600 }}>Pending: OMR {(st.total-st.paid).toFixed(3)}</span>
+                   <span style={{ color:"#f59e0b",fontWeight:600 }}>{(() => { const fp = formatPending(st.total, st.paid); return fp.value === null ? fp.text : `Pending: ${fp.text}`; })()}</span>
                  </div>
                  <div style={{ background:"#f1f5f9",borderRadius:4,height:6 }}>
                    <div style={{ width:`${Math.min(pct,100)}%`,background:"#6366f1",borderRadius:4,height:6 }} />
@@ -389,7 +406,7 @@ export default function Subcontractors() {
                 </div>
                 <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:8 }}>
                   <span style={{ color:"#10b981",fontWeight:600 }}>Paid: OMR {st.paid.toFixed(3)}</span>
-                  <span style={{ color:"#f59e0b",fontWeight:600 }}>Pending: OMR {(st.total-st.paid).toFixed(3)}</span>
+                  <span style={{ color:"#f59e0b",fontWeight:600 }}>{(() => { const fp = formatPending(st.total, st.paid); return fp.value === null ? fp.text : `Pending: ${fp.text}`; })()}</span>
                 </div>
                 <div style={{ background:"#f1f5f9",borderRadius:4,height:6 }}>
                   <div style={{ width:`${Math.min(pct,100)}%`,background:sp==="Civil Works"?"#6366f1":"#f59e0b",borderRadius:4,height:6 }} />
@@ -418,7 +435,7 @@ export default function Subcontractors() {
                    <div style={{ fontWeight:700,color:"#1e293b",fontSize:14,marginBottom:6 }}>{w.project}</div>
                    <div style={{ display:"flex",gap:16,fontSize:12,marginBottom:8 }}>
                      <span style={{ color:"#10b981",fontWeight:600 }}>Paid: OMR {parseFloat(w.paid).toFixed(3)}</span>
-                     <span style={{ color:"#f59e0b",fontWeight:600 }}>Pending: OMR {(w.contract_amount-w.paid).toFixed(3)}</span>
+                     <span style={{ color:"#f59e0b",fontWeight:600 }}>{(() => { const fp = formatPending(w.contract_amount, w.paid); return fp.value === null ? fp.text : `Pending: ${fp.text}`; })()}</span>
                      <span style={{ color:"#6366f1",fontWeight:700 }}>{pct}% complete</span>
                    </div>
                    <div style={{ background:"#f1f5f9",borderRadius:4,height:5,maxWidth:400 }}>
@@ -456,7 +473,7 @@ export default function Subcontractors() {
               {[
                 ["Contract Value","OMR "+parseFloat(selectedWork.contract_amount).toFixed(3),"#6366f1"],
                 ["Amount Paid","OMR "+parseFloat(selectedWork.paid).toFixed(3),"#10b981"],
-                ["Pending","OMR "+(selectedWork.contract_amount-selectedWork.paid).toFixed(3),"#f59e0b"],
+                (() => { const fp = formatPending(selectedWork.contract_amount, selectedWork.paid); return ["Pending", fp.text, fp.color]; })(),
                 ["Completion",`${selectedWork.contract_amount>0?Math.round((selectedWork.paid/selectedWork.contract_amount)*100):0}%`,"#6366f1"],
               ].map(([l,v,c])=>(
                 <div key={l} style={{ background:"#fff",borderRadius:8,padding:"10px 12px",border:"1px solid #e2e8f0" }}>
@@ -494,7 +511,7 @@ export default function Subcontractors() {
             )}
           </div>
 
-          {!isAdmin&&<div style={{ padding:"8px 20px",background:"#fffbeb",fontSize:12,color:"#92400e" }}>👁 View only — Login as admin to edit</div>}
+          {!isAdmin&&<div style={{ padding:"8px 20px",background:"#fffbeb",fontSize:12,color:"#92400e" }}>👁 View only — Admin login required to add contracts, payments, or edit amounts</div>}
 
           <div style={{ padding:20 }}>
             {/* MILESTONE GRAPHS */}
