@@ -56,7 +56,7 @@ const STATUS_STYLE = {
 // ─── Main Component ──────────────────────────────────────────
 export default function BillsPayables() {
   const { isAdmin: realIsAdmin, canEdit, setShowLogin, confirmAction, logActivity } = useAdmin();
-  const isAdmin = canEdit("creditpurchases");
+  const isAdmin = canEdit("bills") || canEdit("creditpurchases");
 
   const [tab, setTab]               = useState("suppliers");
   const [suppliers, setSuppliers]   = useState([]);
@@ -75,6 +75,7 @@ export default function BillsPayables() {
   const [showBillForm, setShowBillForm] = useState(false);
   const [billForm, setBillForm]     = useState(emptyBillForm());
   const [editingBill, setEditingBill] = useState(null);
+  const [viewingBill, setViewingBill] = useState(null); // bill object for read-only view modal
 
   const [showPayForm, setShowPayForm] = useState(null); // bill id
   const [showSupplierPay, setShowSupplierPay] = useState(null);
@@ -947,7 +948,11 @@ export default function BillsPayables() {
                             <span style={{background:st.bg, color:st.c, borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:600}}>{status}</span>
                           </td>
                           <td style={{padding:"10px 14px"}}>
-                            <div style={{display:"flex", gap:4}}>
+                            <div style={{display:"flex", gap:4, flexWrap:"wrap"}}>
+                              <button onClick={()=>setViewingBill(b)}
+                                style={{background:"#f0f9ff", color:"#0284c7", border:"1px solid #bae6fd", borderRadius:6, padding:"5px 10px", cursor:"pointer", fontSize:11, fontWeight:600, whiteSpace:"nowrap"}}>
+                                👁 View
+                              </button>
                               {isAdmin && status!=="Paid" && (
                                 <button onClick={()=>{setShowPayForm(showPayForm===b.id?null:b.id); setPayForm({amount:bal.toFixed(3), payment_date:new Date().toISOString().split("T")[0], bank_account_id:"", notes:""}); }}
                                   style={{background:"#ecfdf5", color:"#10b981", border:"1px solid #86efac", borderRadius:6, padding:"5px 10px", cursor:"pointer", fontSize:11, fontWeight:600, whiteSpace:"nowrap"}}>
@@ -1042,6 +1047,132 @@ export default function BillsPayables() {
             </div>
           </div>
         )}
+
+
+
+        {/* ══════════════ BILL VIEW MODAL ══════════════ */}
+        {viewingBill && (()=>{
+          const b = viewingBill;
+          const supp = suppliers.find(s=>s.id===b.supplier_id);
+          const items = billItems.filter(it=>it.bill_id===b.id);
+          const myPays = payments.filter(p=>p.bill_id===b.id);
+          const paid = getBillsPaid(b.id);
+          const bal = getBillBalance(b);
+          const status = getBillStatus(b);
+          const st = STATUS_STYLE[status] || {bg:"#f1f5f9", c:"#64748b"};
+          return (
+            <div onClick={()=>setViewingBill(null)} style={{position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:16}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:"#fff", borderRadius:16, width:"min(720px,100%)", maxHeight:"90vh", overflow:"auto", boxShadow:"0 25px 50px -12px rgba(0,0,0,0.25)"}}>
+                <div style={{padding:"18px 22px", borderBottom:"1px solid #e2e8f0", display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, background:"#fff", zIndex:1}}>
+                  <div>
+                    <div style={{fontWeight:800, fontSize:16, color:"#0f172a"}}>📄 Bill Details</div>
+                    <div style={{fontSize:12, color:"#64748b", marginTop:2}}>{b.bill_number || "No ref"} · {b.bill_date || "—"}</div>
+                  </div>
+                  <div style={{display:"flex", gap:8, alignItems:"center"}}>
+                    <span style={{background:st.bg, color:st.c, borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:700}}>{status}</span>
+                    <button onClick={()=>setViewingBill(null)} style={{background:"#f1f5f9", border:"none", borderRadius:8, width:36, height:36, cursor:"pointer", fontSize:16}}>✕</button>
+                  </div>
+                </div>
+                <div style={{padding:22}}>
+                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:18}}>
+                    <div style={{background:"#f8fafc", borderRadius:10, padding:14}}>
+                      <div style={{fontSize:11, color:"#94a3b8", fontWeight:600, marginBottom:4}}>SUPPLIER</div>
+                      <div style={{fontWeight:700, color:"#0f172a"}}>{supp?.name || "—"}</div>
+                      {supp?.cr_number && <div style={{fontSize:11, color:"#64748b", marginTop:2}}>CR: {supp.cr_number}</div>}
+                      {supp?.phone && <div style={{fontSize:11, color:"#64748b"}}>{supp.phone}</div>}
+                    </div>
+                    <div style={{background:"#f8fafc", borderRadius:10, padding:14}}>
+                      <div style={{fontSize:11, color:"#94a3b8", fontWeight:600, marginBottom:4}}>SITE / LOCATION</div>
+                      <div style={{fontWeight:600, color:"#0f172a"}}>{b.site || "—"}</div>
+                      <div style={{fontSize:11, color:"#64748b", marginTop:6}}>Payment: {(b.payment_type||"").toUpperCase()}</div>
+                      {b.due_date && <div style={{fontSize:11, color:"#64748b"}}>Due: {b.due_date}</div>}
+                    </div>
+                  </div>
+
+                  <div style={{marginBottom:14}}>
+                    <div style={{fontSize:11, color:"#94a3b8", fontWeight:600, marginBottom:4}}>DESCRIPTION</div>
+                    <div style={{color:"#334155", fontSize:13, lineHeight:1.5}}>{b.description || "—"}</div>
+                    {b.notes && <div style={{fontSize:12, color:"#64748b", marginTop:6, fontStyle:"italic"}}>{b.notes}</div>}
+                  </div>
+
+                  <div style={{fontSize:13, fontWeight:700, color:"#0f172a", marginBottom:8}}>Line Items ({items.length})</div>
+                  {items.length===0 ? (
+                    <div style={{padding:16, background:"#f8fafc", borderRadius:10, color:"#94a3b8", fontSize:13, marginBottom:16}}>No line items recorded for this bill.</div>
+                  ) : (
+                    <table style={{width:"100%", borderCollapse:"collapse", fontSize:12, marginBottom:16}}>
+                      <thead>
+                        <tr style={{background:"#0f172a", color:"#fff"}}>
+                          {["#","Description","Qty","Unit","Rate","Amount"].map(h=>(
+                            <th key={h} style={{padding:"8px 10px", textAlign:"left", fontWeight:600}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((it, idx)=>(
+                          <tr key={it.id||idx} style={{borderBottom:"1px solid #f1f5f9", background:idx%2?"#fafbfc":"#fff"}}>
+                            <td style={{padding:"8px 10px", color:"#94a3b8"}}>{idx+1}</td>
+                            <td style={{padding:"8px 10px", fontWeight:600, color:"#1e293b"}}>{it.description||"—"}</td>
+                            <td style={{padding:"8px 10px"}}>{parseFloat(it.quantity||0).toFixed(3)}</td>
+                            <td style={{padding:"8px 10px", color:"#64748b"}}>{it.unit||"pcs"}</td>
+                            <td style={{padding:"8px 10px"}}>{parseFloat(it.rate||0).toFixed(3)}</td>
+                            <td style={{padding:"8px 10px", fontWeight:700, color:"#6366f1"}}>{parseFloat(it.amount||0).toFixed(3)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:18}}>
+                    {[
+                      ["Net", parseFloat(b.net_amount||0).toFixed(3), "#64748b"],
+                      ["VAT", parseFloat(b.vat_amount||0).toFixed(3), "#f59e0b"],
+                      ["Total", parseFloat(b.total_amount||0).toFixed(3), "#6366f1"],
+                      ["Balance", bal.toFixed(3), bal>0.001?"#ef4444":"#10b981"],
+                    ].map(([l,v,c])=>(
+                      <div key={l} style={{background:"#f8fafc", borderRadius:10, padding:12, textAlign:"center"}}>
+                        <div style={{fontSize:10, color:"#94a3b8", fontWeight:600}}>{l}</div>
+                        <div style={{fontSize:15, fontWeight:800, color:c, marginTop:2}}>OMR {v}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{fontSize:13, fontWeight:700, color:"#0f172a", marginBottom:8}}>Payments ({myPays.length})</div>
+                  {myPays.length===0 ? (
+                    <div style={{padding:12, background:"#fef2f2", borderRadius:10, color:"#ef4444", fontSize:12}}>No payments recorded.</div>
+                  ) : (
+                    <div style={{display:"flex", flexDirection:"column", gap:6}}>
+                      {myPays.map(py=>{
+                        const acc = bankAccounts.find(a=>a.id===py.bank_account_id);
+                        return (
+                          <div key={py.id} style={{display:"flex", gap:12, flexWrap:"wrap", alignItems:"center", padding:"10px 12px", background:"#ecfdf5", borderRadius:8, fontSize:12}}>
+                            <span style={{color:"#64748b"}}>{py.payment_date}</span>
+                            <span style={{fontWeight:800, color:"#10b981"}}>OMR {parseFloat(py.amount||0).toFixed(3)}</span>
+                            {acc && <span style={{background:"#fff", borderRadius:12, padding:"2px 10px", color:"#059669", fontWeight:600}}>🏦 {acc.account_name}</span>}
+                            {py.notes && <span style={{color:"#64748b"}}>{py.notes}</span>}
+                          </div>
+                        );
+                      })}
+                      <div style={{fontSize:12, color:"#64748b", marginTop:4}}>Total paid: <strong style={{color:"#10b981"}}>OMR {paid.toFixed(3)}</strong></div>
+                    </div>
+                  )}
+
+                  <div style={{display:"flex", gap:10, marginTop:22, justifyContent:"flex-end"}}>
+                    {isAdmin && (
+                      <button onClick={()=>{ setViewingBill(null); startEditBill(b); }}
+                        style={{background:"#6366f1", color:"#fff", border:"none", borderRadius:8, padding:"10px 18px", cursor:"pointer", fontSize:13, fontWeight:600}}>
+                        ✏️ Edit Bill
+                      </button>
+                    )}
+                    <button onClick={()=>setViewingBill(null)}
+                      style={{background:"#f1f5f9", color:"#475569", border:"none", borderRadius:8, padding:"10px 18px", cursor:"pointer", fontSize:13, fontWeight:600}}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
 
         {/* ══════════════ RECURRING TAB ══════════════ */}
