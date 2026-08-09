@@ -128,12 +128,33 @@ export default function Reports() {
   });
 
   const trackingOnlyNames = bankAccounts.filter(a => a.include_in_balance === false).map(a => a.account_name);
-  const filtLedger = ledger.filter(e =>
-    !trackingOnlyNames.includes(e.payment_mode) &&
+  const netLedgerAll = ledger.filter(e => !trackingOnlyNames.includes(e.payment_mode));
+  const filtLedger = netLedgerAll.filter(e =>
     (!startDate || e.entry_date >= startDate) && (!endDate || e.entry_date <= endDate)
   );
   const totalIncome = filtLedger.filter(e => e.type === "Credits (Income)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
   const totalExpense = filtLedger.filter(e => e.type === "Debits (Payouts)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+
+  // Bank openings for accounts included in net cash
+  const bankOpeningSum = bankAccounts
+    .filter(a => a.include_in_balance !== false)
+    .reduce((s, a) => s + parseFloat(a.opening_balance || 0), 0);
+  // Movements before selected start date (= opening for the statement period)
+  const priorLedger = startDate
+    ? netLedgerAll.filter(e => e.entry_date && e.entry_date < startDate)
+    : [];
+  const priorNet = priorLedger.reduce((s, e) => {
+    const amt = parseFloat(e.amount || 0);
+    return s + (e.type === "Credits (Income)" ? amt : -amt);
+  }, 0);
+  const statementOpening = bankOpeningSum + priorNet;
+  // All-time current net balance
+  const allTimeNet = netLedgerAll.reduce((s, e) => {
+    const amt = parseFloat(e.amount || 0);
+    return s + (e.type === "Credits (Income)" ? amt : -amt);
+  }, 0);
+  const currentTotalBalance = bankOpeningSum + allTimeNet;
+  const statementClosing = statementOpening + totalIncome - totalExpense;
   const totalContract = projWithSched.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
   const totalReceived = projWithSched.reduce((s, p) => s + p.received, 0);
   const activeProjects = projects.filter(p => p.status === "Active").length;
@@ -147,7 +168,7 @@ export default function Reports() {
     <div className="header">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>TRATEEL AL NAJAH CONSTRUCTION</div>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>TRATEEL AL NAJAH FOR TRADING</div>
           <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Oman | Trading · VAT OM1100538733</div>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Powered by Minarva Technologies ERP v1.0</div>
         </div>
@@ -188,7 +209,32 @@ export default function Reports() {
               rows = filtered.map((b,i) => ({ "AT": i+1, "Date": b.bill_date, "Month": months[new Date(b.bill_date).getMonth()]||"", "P/E": (bpSuppliers.find(s=>s.id===b.supplier_id)||{}).category||"Purchase", "Invoice": b.bill_number||"", "Supplier": suppName(b.supplier_id), "Value": parseFloat(b.net_amount||0).toFixed(3), "VAT": parseFloat(b.vat_amount||0).toFixed(3), "Roundoff": (parseFloat(b.total_amount||0)-parseFloat(b.net_amount||0)-parseFloat(b.vat_amount||0)).toFixed(3), "Total": parseFloat(b.total_amount||0).toFixed(3) }));
             } else if (activeTab === "ledger") {
               fname = "Cashbook_Statement";
-              rows = ledger.filter(e => (!startDate || e.entry_date >= startDate) && (!endDate || e.entry_date <= endDate)).map(e => ({ "Date": e.entry_date, "Description": e.description, "Payee": e.payee, "Category": e.category, "Site": e.site||"", "Account": e.payment_mode, "Type": e.type==="Credits (Income)"?"Credit":"Debit", "Amount": parseFloat(e.amount||0).toFixed(3) }));
+              const xlEntries = ledger.filter(e => !trackingOnlyNames.includes(e.payment_mode) && (!startDate || e.entry_date >= startDate) && (!endDate || e.entry_date <= endDate))
+                .slice().sort((a,b)=>(a.entry_date||"").localeCompare(b.entry_date||"")||(a.created_at||"").localeCompare(b.created_at||""));
+              let run = statementOpening;
+              const xlRows = [
+                { "Date": startDate || "", "Description": "Opening Balance (brought forward)", "Payee": "", "Category": "", "Site": "", "Account": "", "Type": "Opening", "Credit": "", "Debit": "", "Balance": statementOpening.toFixed(3) },
+              ];
+              for (const e of xlEntries) {
+                const amt = parseFloat(e.amount||0);
+                const isC = e.type === "Credits (Income)";
+                run += isC ? amt : -amt;
+                xlRows.push({
+                  "Date": e.entry_date,
+                  "Description": e.description || "",
+                  "Payee": e.payee || "",
+                  "Category": e.category || "",
+                  "Site": e.site || "",
+                  "Account": e.payment_mode || "",
+                  "Type": isC ? "Credit" : "Debit",
+                  "Credit": isC ? amt.toFixed(3) : "",
+                  "Debit": !isC ? amt.toFixed(3) : "",
+                  "Balance": run.toFixed(3),
+                });
+              }
+              xlRows.push({ "Date": endDate || "", "Description": "Closing Balance (period)", "Payee": "", "Category": "", "Site": "", "Account": "", "Type": "Closing", "Credit": "", "Debit": "", "Balance": statementClosing.toFixed(3) });
+              xlRows.push({ "Date": "", "Description": "Current Total Balance (all-time net cash)", "Payee": "", "Category": "", "Site": "", "Account": "", "Type": "Current", "Credit": "", "Debit": "", "Balance": currentTotalBalance.toFixed(3) });
+              rows = xlRows;
             } else if (activeTab === "accounts") {
               fname = "Account_Statement";
               const accId = document.querySelector("[data-acc-filter]")?.value;
@@ -616,7 +662,9 @@ export default function Reports() {
             const cbEntries = filtLedger.filter(e => cbFilter==="All" || (cbFilter==="Credit" && e.type==="Credits (Income)") || (cbFilter==="Debit" && e.type==="Debits (Payouts)")).slice().sort((a,b) => (a.entry_date||"").localeCompare(b.entry_date||"") || (a.created_at||"").localeCompare(b.created_at||""));
             const cbCredits = cbEntries.filter(e=>e.type==="Credits (Income)").reduce((s,e)=>s+parseFloat(e.amount||0),0);
             const cbDebits  = cbEntries.filter(e=>e.type==="Debits (Payouts)").reduce((s,e)=>s+parseFloat(e.amount||0),0);
-            let running = 0;
+            const cbOpening = statementOpening;
+            const cbClosing = cbOpening + cbCredits - cbDebits;
+            let running = cbOpening;
             return (
             <div>
               <div style={{ display:"flex", gap:8, marginBottom:16, alignItems:"center", flexWrap:"wrap" }}>
@@ -625,10 +673,23 @@ export default function Reports() {
                 ))}
                 <span style={{marginLeft:"auto", fontSize:12, color:"#64748b"}}>{cbEntries.length} entries</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
+                <div style={{ background:"#eef2ff", borderRadius:10, padding:"12px 14px", border:"1px solid #c7d2fe" }}>
+                  <div style={{ fontSize:11, color:"#6366f1", fontWeight:700 }}>Opening Balance {startDate ? `(as of day before ${startDate})` : "(start)"}</div>
+                  <div style={{ fontSize:18, fontWeight:800, color:"#4338ca", marginTop:4 }}>OMR {cbOpening.toFixed(3)}</div>
+                  <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>Previous day closing / brought forward</div>
+                </div>
+                <div style={{ background:"#ecfdf5", borderRadius:10, padding:"12px 14px", border:"1px solid #a7f3d0" }}>
+                  <div style={{ fontSize:11, color:"#059669", fontWeight:700 }}>Current Total Balance (all accounts · net cash)</div>
+                  <div style={{ fontSize:18, fontWeight:800, color:"#047857", marginTop:4 }}>OMR {currentTotalBalance.toFixed(3)}</div>
+                  <div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>As of today · full ledger</div>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+                <KPI label="Opening" value={cbOpening.toFixed(3)} color="#6366f1" />
                 <KPI label="Credits (Income)" value={cbCredits.toFixed(3)} color="#10b981" />
                 <KPI label="Debits (Expenses)" value={cbDebits.toFixed(3)} color="#ef4444" />
-                <KPI label="Net Balance" value={(cbCredits-cbDebits).toFixed(3)} color="#6366f1" />
+                <KPI label="Closing Balance" value={cbClosing.toFixed(3)} color={cbClosing>=0?"#0f172a":"#ef4444"} />
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
                 <thead><tr style={{ background: "#0f172a", color: "#fff" }}>
@@ -637,6 +698,13 @@ export default function Reports() {
                   )}
                 </tr></thead>
                 <tbody>
+                  <tr style={{ background:"#eef2ff", borderBottom:"1px solid #c7d2fe" }}>
+                    <td style={{ padding:"8px 10px", color:"#64748b" }}>{startDate || "—"}</td>
+                    <td style={{ padding:"8px 10px", fontWeight:700, color:"#4338ca" }} colSpan={5}>Opening Balance (brought forward)</td>
+                    <td style={{ padding:"8px 10px" }}></td>
+                    <td style={{ padding:"8px 10px" }}></td>
+                    <td style={{ padding:"8px 10px", fontWeight:800, color:"#4338ca" }}>{cbOpening.toFixed(3)}</td>
+                  </tr>
                   {cbEntries.map((e, i) => {
                     const isCredit = e.type==="Credits (Income)";
                     running += isCredit ? parseFloat(e.amount||0) : -parseFloat(e.amount||0);
@@ -655,10 +723,18 @@ export default function Reports() {
                     );
                   })}
                   <tr style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc", fontWeight: 700 }}>
-                    <td colSpan={6} style={{ padding: "10px" }}>TOTAL ({cbEntries.length} entries)</td>
+                    <td colSpan={6} style={{ padding: "10px" }}>Period TOTAL ({cbEntries.length} entries)</td>
                     <td style={{ padding: "10px", color: "#10b981" }}>{cbCredits.toFixed(3)}</td>
                     <td style={{ padding: "10px", color: "#ef4444" }}>{cbDebits.toFixed(3)}</td>
                     <td style={{ padding: "10px", color: running>=0?"#6366f1":"#ef4444" }}>{running.toFixed(3)}</td>
+                  </tr>
+                  <tr style={{ background: "#ecfdf5", fontWeight: 800 }}>
+                    <td colSpan={8} style={{ padding: "10px", color: "#047857" }}>Closing Balance (end of period)</td>
+                    <td style={{ padding: "10px", color: cbClosing>=0?"#047857":"#ef4444" }}>{cbClosing.toFixed(3)}</td>
+                  </tr>
+                  <tr style={{ background: "#f0fdf4", fontWeight: 700 }}>
+                    <td colSpan={8} style={{ padding: "10px", color: "#166534" }}>Current Total Balance (all-time net cash)</td>
+                    <td style={{ padding: "10px", color: "#166534" }}>{currentTotalBalance.toFixed(3)}</td>
                   </tr>
                 </tbody>
               </table>
