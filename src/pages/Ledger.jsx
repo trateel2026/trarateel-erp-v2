@@ -124,12 +124,31 @@ export default function Ledger() {
       }
     }
 
+    const amt = parseFloat(form.amount) || 0;
     await supabase.from("ledger").insert({
       entry_date: form.entry_date, description: form.description, payee: form.payee,
-      type: form.type, category: form.category, amount: parseFloat(form.amount),
+      type: form.type, category: form.category, amount: amt,
       ref_voucher: form.ref_voucher, site: form.site, remarks: form.remarks, payment_mode: form.payment_mode,
       bank_account_id: form.bank_account_id || null
     });
+
+    // Auto-link: Subcontractor debit + payee name → add to subcontractors.paid
+    try {
+      const cat = (form.category || "").toLowerCase();
+      const payee = (form.payee || "").trim();
+      if (form.type === "Debits (Payouts)" && cat.includes("subcontract") && payee && amt > 0) {
+        const { data: subs } = await supabase.from("subcontractors").select("id, name, paid");
+        const matches = (subs || []).filter(s => (s.name || "").trim().toLowerCase() === payee.toLowerCase());
+        for (const s of matches) {
+          const newPaid = (parseFloat(s.paid) || 0) + amt;
+          await supabase.from("subcontractors").update({ paid: newPaid }).eq("id", s.id);
+        }
+        if (matches.length) {
+          console.log(`Linked OMR ${amt} to ${matches.length} subcontractor row(s): ${payee}`);
+        }
+      }
+    } catch (e) { console.warn("Subcontractor auto-link failed", e); }
+
     setShowForm(false); setDuplicateWarning(null);
     await loadEntries();
   };
