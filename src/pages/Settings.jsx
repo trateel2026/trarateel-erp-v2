@@ -232,6 +232,9 @@ export default function Settings() {
           <div style={{background:"#0f172a",borderRadius:12,padding:24,color:"#f1f5f9",marginBottom:16}}>
             <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🗄 MANUAL SYSTEM BACKUP</div>
             <div style={{fontSize:12,color:"#94a3b8",marginBottom:16}}>Download complete backup of all business data — projects, invoices, employees, attendance, payroll, ledger, subcontractors.</div>
+            <div style={{fontSize:11,color:"#64748b",marginBottom:12,lineHeight:1.5,background:"#0f172a",borderRadius:8,padding:"10px 12px",border:"1px solid #1e293b"}}>
+              📧 <strong style={{color:"#94a3b8"}}>Daily auto-backup to email</strong> can be enabled via Supabase Edge Function + Resend (see <code style={{color:"#60a5fa"}}>supabase/functions/daily-backup</code>). Until configured, use manual download below.
+            </div>
             <button onClick={downloadBackup} disabled={backupLoading}
               style={{width:"100%",background:backupLoading?"#1e293b":"#fff",color:backupLoading?"#64748b":"#0f172a",border:"none",borderRadius:8,padding:"12px",fontSize:13,fontWeight:700,cursor:backupLoading?"not-allowed":"pointer"}}>
               {backupLoading?"⏳ Preparing...":"⬇ Run Full Backup & Download"}
