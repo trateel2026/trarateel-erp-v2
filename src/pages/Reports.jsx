@@ -1001,16 +1001,6 @@ export default function Reports() {
               });
             };
 
-            let totalPresent = 0, totalAbsent = 0, totalOT = 0, totalHours = 0;
-            viewDates.forEach(d => {
-              buildDayRows(d).forEach(r => {
-                if (r.status === "Present") totalPresent++;
-                else totalAbsent++;
-                totalOT += r.ot;
-                totalHours += r.hours;
-              });
-            });
-
             return (
               <div>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16, background: "#f8fafc", padding: 14, borderRadius: 10, border: "1px solid #e2e8f0" }}>
@@ -1044,11 +1034,6 @@ export default function Reports() {
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
-                  <KPI label="Present (sum of days)" value={totalPresent} unit="emp-days" color="#10b981" />
-                  <KPI label="Absent (sum of days)" value={totalAbsent} unit="emp-days" color="#ef4444" />
-                  <KPI label="Overtime Hours" value={totalOT.toFixed(1)} unit="hrs" color="#f59e0b" />
-                </div>
 
                 {viewDates.map(d => {
                   const rows = buildDayRows(d);
