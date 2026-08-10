@@ -148,7 +148,6 @@ function printReceipt(emp, payment, pr, co = {}) {
   <div class="bdy">
     <div class="row"><span style="color:#64748b">Employee</span><span style="font-weight:700">${emp.name}</span></div>
     <div class="row"><span style="color:#64748b">Designation</span><span>${emp.role || "—"}</span></div>
-    <div class="row"><span style="color:#64748b">Daily Rate</span><span>OMR ${parseFloat(emp.daily_rate || 0).toFixed(3)}</span></div>
     ${pr ? `<div class="row"><span style="color:#64748b">Period</span><span>${pr.period_label || ""}</span></div>` : ""}
     <div class="amount">
       <div style="font-size:12px;color:#94a3b8;margin-bottom:4px">AMOUNT PAID (${payment.payment_type})</div>
