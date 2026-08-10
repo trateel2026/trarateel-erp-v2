@@ -149,10 +149,9 @@ export default function Reports() {
   }, 0);
   const statementOpening = bankOpeningSum + priorNet;
   // All-time current net balance
-  const allTimeNet = netLedgerAll.reduce((s, e) => {
-    const amt = parseFloat(e.amount || 0);
-    return s + (e.type === "Credits (Income)" ? amt : -amt);
-  }, 0);
+  const allTimeCredits = netLedgerAll.filter(e => e.type === "Credits (Income)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const allTimeDebits = netLedgerAll.filter(e => e.type === "Debits (Payouts)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const allTimeNet = allTimeCredits - allTimeDebits;
   const currentTotalBalance = bankOpeningSum + allTimeNet;
   const statementClosing = statementOpening + totalIncome - totalExpense;
   const totalContract = projWithSched.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
@@ -179,6 +178,26 @@ export default function Reports() {
           </div>
         </div>
       </div>
+      {activeTab === "ledger" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(148,163,184,0.25)" }}>
+          <div>
+            <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>COMPANY TOTAL CREDITS</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#34d399" }}>OMR {allTimeCredits.toFixed(3)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>COMPANY TOTAL DEBITS</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#f87171" }}>OMR {allTimeDebits.toFixed(3)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>PERIOD CREDITS</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#6ee7b7" }}>OMR {totalIncome.toFixed(3)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>PERIOD DEBITS</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#fca5a5" }}>OMR {totalExpense.toFixed(3)}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -213,6 +232,8 @@ export default function Reports() {
                 .slice().sort((a,b)=>(a.entry_date||"").localeCompare(b.entry_date||"")||(a.created_at||"").localeCompare(b.created_at||""));
               let run = statementOpening;
               const xlRows = [
+                { "Date": "", "Description": "COMPANY TOTAL CREDITS (all time)", "Payee": "", "Category": "", "Site": "", "Account": "", "Type": "Summary", "Credit": allTimeCredits.toFixed(3), "Debit": "", "Balance": "" },
+                { "Date": "", "Description": "COMPANY TOTAL DEBITS (all time)", "Payee": "", "Category": "", "Site": "", "Account": "", "Type": "Summary", "Credit": "", "Debit": allTimeDebits.toFixed(3), "Balance": "" },
                 { "Date": startDate || "", "Description": "Opening Balance (brought forward)", "Payee": "", "Category": "", "Site": "", "Account": "", "Type": "Opening", "Credit": "", "Debit": "", "Balance": statementOpening.toFixed(3) },
               ];
               for (const e of xlEntries) {
@@ -672,6 +693,16 @@ export default function Reports() {
                   <button key={f} onClick={()=>setCbFilter(f)} style={{padding:"6px 16px", borderRadius:20, border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:cbFilter===f?"#6366f1":"#f1f5f9", color:cbFilter===f?"#fff":"#64748b"}}>{f==="Credit"?"💚 Credits Only":f==="Debit"?"🔴 Debits Only":"All Entries"}</button>
                 ))}
                 <span style={{marginLeft:"auto", fontSize:12, color:"#64748b"}}>{cbEntries.length} entries</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
+                <div style={{ background:"#ecfdf5", borderRadius:10, padding:"14px 16px", border:"1px solid #a7f3d0" }}>
+                  <div style={{ fontSize:11, color:"#059669", fontWeight:700 }}>COMPANY TOTAL CREDITS (all time)</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:"#047857", marginTop:4 }}>OMR {allTimeCredits.toFixed(3)}</div>
+                </div>
+                <div style={{ background:"#fef2f2", borderRadius:10, padding:"14px 16px", border:"1px solid #fecaca" }}>
+                  <div style={{ fontSize:11, color:"#dc2626", fontWeight:700 }}>COMPANY TOTAL DEBITS (all time)</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:"#b91c1c", marginTop:4 }}>OMR {allTimeDebits.toFixed(3)}</div>
+                </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
                 <div style={{ background:"#eef2ff", borderRadius:10, padding:"12px 14px", border:"1px solid #c7d2fe" }}>
