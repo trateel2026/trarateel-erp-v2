@@ -174,7 +174,7 @@ export default function Reports() {
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.5 }}>TRATEEL AL NAJAH FOR TRADING</div>
           <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Oman | Trading · VAT OM1100538733</div>
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Powered by Minarva Technologies ERP v1.0</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Powered by Minarva Technologies ERP v1.0 · Cashbook v2</div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#60a5fa" }}>{tabs.find(t => t.id === activeTab)?.label} Report</div>
