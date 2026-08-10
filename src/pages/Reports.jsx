@@ -264,7 +264,7 @@ export default function Reports() {
               fname = "Daily_Attendance";
               const day = attDay || new Date().toISOString().split("T")[0];
               const dayStart = startDate || day;
-              const dayEnd = endDate || day;
+              const dayEnd = endDate || startDate || day;
               const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
               rows = [];
               const dates = [];
@@ -949,20 +949,22 @@ export default function Reports() {
 
           {/* DAILY ATTENDANCE */}
           {activeTab === "attendance" && (() => {
-            const dayStart = startDate || attDay || new Date().toISOString().split("T")[0];
-            const dayEnd = endDate || attDay || dayStart;
+            const today = new Date().toISOString().split("T")[0];
+            const dayStart = startDate || attDay || today;
+            const dayEnd = endDate || (startDate ? startDate : (attDay || today));
             const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
-            const dates = [];
+            const viewDates = [];
             {
               const cur = new Date(dayStart + "T00:00:00");
               const end = new Date(dayEnd + "T00:00:00");
-              while (cur <= end) {
-                dates.push(cur.toISOString().split("T")[0]);
+              // safety: max 62 days
+              let n = 0;
+              while (cur <= end && n < 62) {
+                viewDates.push(cur.toISOString().split("T")[0]);
                 cur.setDate(cur.getDate() + 1);
+                n++;
               }
             }
-            // Default single-day view uses attDay when range empty
-            const viewDates = (startDate || endDate) ? dates : [attDay || new Date().toISOString().split("T")[0]];
 
             const buildDayRows = (d) => {
               return activeEmps.map(emp => {
@@ -997,13 +999,35 @@ export default function Reports() {
 
             return (
               <div>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16, background: "#f8fafc", padding: 14, borderRadius: 10, border: "1px solid #e2e8f0" }}>
                   <div>
-                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>Quick day</div>
-                    <input type="date" value={attDay} onChange={e => { setAttDay(e.target.value); setStartDate(""); setEndDate(""); }}
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>From date</div>
+                    <input type="date" value={startDate || attDay || today}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setStartDate(v);
+                        setAttDay(v);
+                        if (!endDate || endDate < v) setEndDate(v);
+                      }}
                       style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 13 }} />
                   </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>or use period filters above for date range</div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>To date</div>
+                    <input type="date" value={endDate || startDate || attDay || today}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setEndDate(v);
+                        if (!startDate) { setStartDate(v); setAttDay(v); }
+                      }}
+                      style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 13 }} />
+                  </div>
+                  <button type="button" onClick={() => {
+                    const t0 = new Date().toISOString().split("T")[0];
+                    setAttDay(t0); setStartDate(t0); setEndDate(t0);
+                  }} style={{ background: "#eef2ff", color: "#6366f1", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Today</button>
+                  <div style={{ fontSize: 12, color: "#64748b", marginLeft: 4 }}>
+                    Showing <strong>{viewDates.length}</strong> day{viewDates.length !== 1 ? "s" : ""}: {dayStart} → {dayEnd}
+                  </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
