@@ -24,6 +24,7 @@ const tabs = [
   { id: "subcontractors", label: "Subcontractor Balances", icon: "🔧" },
   { id: "commissions", label: "Commission Ledger", icon: "💼" },
   { id: "payroll", label: "Payroll Summary", icon: "👤" },
+  { id: "attendance", label: "📅 Daily Attendance", icon: "📅" },
 ];
 
 export default function Reports() {
@@ -48,15 +49,17 @@ export default function Reports() {
   const [bpSuppliers, setBpSuppliers] = useState([]);
   const [bpBills, setBpBills] = useState([]);
   const [bpPayments, setBpPayments] = useState([]);
+  const [attendance, setAttendance] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [cbFilter, setCbFilter] = useState("All");
   const [suppSubTab, setSuppSubTab] = useState("all");
+  const [attDay, setAttDay] = useState(() => new Date().toISOString().split("T")[0]);
 
   useEffect(() => { loadAllData(); }, []);
 
   const loadAllData = async () => {
     setLoading(true);
-    const [p, s, l, sb, sm, c, e, py, bps, bpb, bpp] = await Promise.all([
+    const [p, s, l, sb, sm, c, e, py, bps, bpb, bpp, att] = await Promise.all([
       supabase.from("projects").select("*").order("created_at"),
       supabase.from("schedules").select("*"),
       supabase.from("ledger").select("*").order("entry_date"),
@@ -68,6 +71,7 @@ export default function Reports() {
       supabase.from("bp_suppliers").select("*").order("name"),
       supabase.from("bp_bills").select("*").order("bill_date"),
       supabase.from("bp_payments").select("*").order("payment_date"),
+      supabase.from("attendance").select("*").order("att_date", { ascending: false }),
     ]);
     setProjects(p.data || []);
     setSchedules(s.data || []);
@@ -80,6 +84,7 @@ export default function Reports() {
     setBpSuppliers(bps.data || []);
     setBpBills(bpb.data || []);
     setBpPayments(bpp.data || []);
+    setAttendance(att.data || []);
     getBankAccounts().then(setBankAccounts);
     setLoading(false);
   };
@@ -275,6 +280,49 @@ export default function Reports() {
             } else if (activeTab === "payments") {
               fname = "Payment_Collections";
               rows = ledger.filter(e => e.type==="Credits (Income)" && (!startDate || e.entry_date >= startDate) && (!endDate || e.entry_date <= endDate)).map(e => ({ "Date": e.entry_date, "Description": e.description, "Payee": e.payee, "Category": e.category, "Account": e.payment_mode, "Amount": parseFloat(e.amount||0).toFixed(3) }));
+            } else if (activeTab === "attendance") {
+              fname = "Daily_Attendance";
+              const day = attDay || new Date().toISOString().split("T")[0];
+              const dayStart = startDate || day;
+              const dayEnd = endDate || day;
+              const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
+              rows = [];
+              const dates = [];
+              {
+                const cur = new Date(dayStart + "T00:00:00");
+                const end = new Date(dayEnd + "T00:00:00");
+                while (cur <= end) {
+                  dates.push(cur.toISOString().split("T")[0]);
+                  cur.setDate(cur.getDate() + 1);
+                }
+              }
+              for (const d of dates) {
+                for (const emp of activeEmps) {
+                  const rec = attendance.find(a => a.employee_id === emp.id && (a.att_date === d || a.work_date === d));
+                  let status = "Absent";
+                  let hours = 0, ot = 0, site = "", notes = "";
+                  if (rec) {
+                    hours = parseFloat(rec.hours_worked || 0);
+                    ot = parseFloat(rec.Overtime || rec.overtime || 0);
+                    site = rec.site || "";
+                    notes = rec.notes || "";
+                    if ((rec.notes || "").toLowerCase() === "absent" || (hours === 0 && (rec.notes || "").toLowerCase().includes("absent"))) status = "Absent";
+                    else if (hours > 0 || (rec.notes || "").toLowerCase() === "present") status = "Present";
+                    else status = "Absent";
+                  }
+                  rows.push({
+                    "Date": d,
+                    "Employee": emp.name,
+                    "Role": emp.role || "",
+                    "Group": emp.emp_group || "",
+                    "Status": status,
+                    "Hours": hours.toFixed(2),
+                    "Overtime (hrs)": ot.toFixed(2),
+                    "Site": site,
+                    "Notes": notes,
+                  });
+                }
+              }
             }
             if (rows.length === 0) { alert("No data to export for the selected period/tab."); return; }
             downloadExcel(rows, fname + "_" + new Date().toISOString().split("T")[0]);
@@ -917,6 +965,166 @@ export default function Reports() {
               })}
             </div>
           )}
+
+
+          {/* DAILY ATTENDANCE */}
+          {activeTab === "attendance" && (() => {
+            const dayStart = startDate || attDay || new Date().toISOString().split("T")[0];
+            const dayEnd = endDate || attDay || dayStart;
+            const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
+            const dates = [];
+            {
+              const cur = new Date(dayStart + "T00:00:00");
+              const end = new Date(dayEnd + "T00:00:00");
+              while (cur <= end) {
+                dates.push(cur.toISOString().split("T")[0]);
+                cur.setDate(cur.getDate() + 1);
+              }
+            }
+            // Default single-day view uses attDay when range empty
+            const viewDates = (startDate || endDate) ? dates : [attDay || new Date().toISOString().split("T")[0]];
+
+            const buildDayRows = (d) => {
+              return activeEmps.map(emp => {
+                const rec = attendance.find(a => a.employee_id === emp.id && (a.att_date === d || a.work_date === d));
+                let status = "Absent";
+                let hours = 0, ot = 0, site = "", notes = "", checkIn = "", checkOut = "";
+                if (rec) {
+                  hours = parseFloat(rec.hours_worked || 0);
+                  ot = parseFloat(rec.Overtime || rec.overtime || 0);
+                  site = rec.site || "";
+                  notes = rec.notes || "";
+                  checkIn = rec.check_in || "";
+                  checkOut = rec.check_out || "";
+                  const n = (rec.notes || "").toLowerCase();
+                  if (n === "absent" || (hours === 0 && n.includes("absent"))) status = "Absent";
+                  else if (hours > 0 || n === "present") status = "Present";
+                  else status = "Absent";
+                }
+                return { emp, status, hours, ot, site, notes, checkIn, checkOut };
+              });
+            };
+
+            let totalPresent = 0, totalAbsent = 0, totalOT = 0, totalHours = 0;
+            viewDates.forEach(d => {
+              buildDayRows(d).forEach(r => {
+                if (r.status === "Present") totalPresent++;
+                else totalAbsent++;
+                totalOT += r.ot;
+                totalHours += r.hours;
+              });
+            });
+
+            return (
+              <div>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>Quick day</div>
+                    <input type="date" value={attDay} onChange={e => { setAttDay(e.target.value); setStartDate(""); setEndDate(""); }}
+                      style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 13 }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#94a3b8" }}>or use period filters above for date range</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+                  <KPI label="Present (records)" value={totalPresent} unit="emp-days" color="#10b981" />
+                  <KPI label="Absent (records)" value={totalAbsent} unit="emp-days" color="#ef4444" />
+                  <KPI label="Total Hours" value={totalHours.toFixed(1)} unit="hrs" color="#6366f1" />
+                  <KPI label="Overtime Hours" value={totalOT.toFixed(1)} unit="hrs" color="#f59e0b" />
+                </div>
+
+                {viewDates.map(d => {
+                  const rows = buildDayRows(d);
+                  const present = rows.filter(r => r.status === "Present");
+                  const absent = rows.filter(r => r.status === "Absent");
+                  const withOT = rows.filter(r => r.ot > 0);
+                  return (
+                    <div key={d} style={{ marginBottom: 28 }}>
+                      <div style={{ fontWeight: 800, fontSize: 15, color: "#0f172a", marginBottom: 10, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, borderLeft: "4px solid #6366f1" }}>
+                        📅 {d} — Present: {present.length} · Absent: {absent.length} · OT: {withOT.length} workers
+                      </div>
+
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#10b981", marginBottom: 6 }}>✅ PRESENT ({present.length})</div>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 16 }}>
+                        <thead>
+                          <tr style={{ background: "#0f172a", color: "#fff" }}>
+                            {["#", "Employee", "Role", "Group", "Hours", "OT (hrs)", "Site", "Notes"].map(h => (
+                              <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontSize: 10 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {present.length === 0 ? (
+                            <tr><td colSpan={8} style={{ padding: 12, color: "#94a3b8", textAlign: "center" }}>No one marked present</td></tr>
+                          ) : present.map((r, i) => (
+                            <tr key={r.emp.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 ? "#f8fafc" : "#fff" }}>
+                              <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{i + 1}</td>
+                              <td style={{ padding: "8px 10px", fontWeight: 700 }}>{r.emp.name}</td>
+                              <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.emp.role || "—"}</td>
+                              <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.emp.emp_group || "—"}</td>
+                              <td style={{ padding: "8px 10px", fontWeight: 700, color: "#6366f1" }}>{r.hours.toFixed(1)}</td>
+                              <td style={{ padding: "8px 10px", fontWeight: 700, color: r.ot > 0 ? "#f59e0b" : "#94a3b8" }}>{r.ot > 0 ? r.ot.toFixed(1) : "—"}</td>
+                              <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.site || "—"}</td>
+                              <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.notes || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginBottom: 6 }}>❌ ABSENT ({absent.length})</div>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 16 }}>
+                        <thead>
+                          <tr style={{ background: "#7f1d1d", color: "#fff" }}>
+                            {["#", "Employee", "Role", "Group", "Notes"].map(h => (
+                              <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontSize: 10 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {absent.length === 0 ? (
+                            <tr><td colSpan={5} style={{ padding: 12, color: "#94a3b8", textAlign: "center" }}>No absentees</td></tr>
+                          ) : absent.map((r, i) => (
+                            <tr key={r.emp.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 ? "#fff5f5" : "#fff" }}>
+                              <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{i + 1}</td>
+                              <td style={{ padding: "8px 10px", fontWeight: 700 }}>{r.emp.name}</td>
+                              <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.emp.role || "—"}</td>
+                              <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.emp.emp_group || "—"}</td>
+                              <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.notes || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {withOT.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", marginBottom: 6 }}>⏱️ OVERTIME ({withOT.length})</div>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ background: "#78350f", color: "#fff" }}>
+                                {["Employee", "Hours", "OT (hrs)", "Site"].map(h => (
+                                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontSize: 10 }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {withOT.map((r, i) => (
+                                <tr key={r.emp.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 ? "#fffbeb" : "#fff" }}>
+                                  <td style={{ padding: "8px 10px", fontWeight: 700 }}>{r.emp.name}</td>
+                                  <td style={{ padding: "8px 10px" }}>{r.hours.toFixed(1)}</td>
+                                  <td style={{ padding: "8px 10px", fontWeight: 800, color: "#f59e0b" }}>{r.ot.toFixed(1)}</td>
+                                  <td style={{ padding: "8px 10px", color: "#64748b" }}>{r.site || "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Report Footer */}
           <div style={{ marginTop: 28, paddingTop: 14, borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94a3b8" }}>
