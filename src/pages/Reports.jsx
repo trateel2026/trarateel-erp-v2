@@ -3,6 +3,17 @@ import { getBankAccounts } from "../lib/bankAccounts";
 import { supabase } from "../lib/supabase";
 import * as XLSX from "xlsx";
 
+
+const toYMD = (d) => {
+  const x = d instanceof Date ? d : new Date(d);
+  return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0");
+};
+const parseYMD = (s) => {
+  const [y, m, d] = (s || "").split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+const STD_WORK_HOURS = 10;
+
 const downloadExcel = (rows, filename) => {
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -269,11 +280,13 @@ export default function Reports() {
               rows = [];
               const dates = [];
               {
-                const cur = new Date(dayStart + "T00:00:00");
-                const end = new Date(dayEnd + "T00:00:00");
-                while (cur <= end) {
-                  dates.push(cur.toISOString().split("T")[0]);
+                const cur = parseYMD(dayStart);
+                const end = parseYMD(dayEnd);
+                let n = 0;
+                while (cur <= end && n < 62) {
+                  dates.push(toYMD(cur));
                   cur.setDate(cur.getDate() + 1);
+                  n++;
                 }
               }
               for (const d of dates) {
@@ -283,7 +296,8 @@ export default function Reports() {
                   let hours = 0, ot = 0, site = "", notes = "";
                   if (rec) {
                     hours = parseFloat(rec.hours_worked || 0);
-                    ot = parseFloat(rec.Overtime || rec.overtime || 0);
+                    ot = parseFloat(rec.Overtime || 0);
+                    if (!ot && hours > STD_WORK_HOURS) ot = hours - STD_WORK_HOURS;
                     site = rec.site || "Sinaw";
                     notes = rec.notes || "";
                     if ((rec.notes || "").toLowerCase() === "absent" || (hours === 0 && (rec.notes || "").toLowerCase().includes("absent"))) status = "Absent";
@@ -955,12 +969,11 @@ export default function Reports() {
             const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
             const viewDates = [];
             {
-              const cur = new Date(dayStart + "T00:00:00");
-              const end = new Date(dayEnd + "T00:00:00");
-              // safety: max 62 days
+              const cur = parseYMD(dayStart);
+              const end = parseYMD(dayEnd);
               let n = 0;
               while (cur <= end && n < 62) {
-                viewDates.push(cur.toISOString().split("T")[0]);
+                viewDates.push(toYMD(cur));
                 cur.setDate(cur.getDate() + 1);
                 n++;
               }
@@ -973,7 +986,8 @@ export default function Reports() {
                 let hours = 0, ot = 0, site = "", notes = "", checkIn = "", checkOut = "";
                 if (rec) {
                   hours = parseFloat(rec.hours_worked || 0);
-                  ot = parseFloat(rec.Overtime || rec.overtime || 0);
+                  ot = parseFloat(rec.Overtime || 0);
+                  if (!ot && hours > STD_WORK_HOURS) ot = hours - STD_WORK_HOURS;
                   site = rec.site || "Sinaw";
                   notes = rec.notes || "";
                   checkIn = rec.check_in || "";
@@ -1031,8 +1045,8 @@ export default function Reports() {
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
-                  <KPI label="Present (records)" value={totalPresent} unit="emp-days" color="#10b981" />
-                  <KPI label="Absent (records)" value={totalAbsent} unit="emp-days" color="#ef4444" />
+                  <KPI label="Present (sum of days)" value={totalPresent} unit="emp-days" color="#10b981" />
+                  <KPI label="Absent (sum of days)" value={totalAbsent} unit="emp-days" color="#ef4444" />
                   <KPI label="Overtime Hours" value={totalOT.toFixed(1)} unit="hrs" color="#f59e0b" />
                 </div>
 
