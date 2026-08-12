@@ -144,7 +144,14 @@ export default function Reports() {
   });
 
   const trackingOnlyNames = bankAccounts.filter(a => a.include_in_balance === false).map(a => a.account_name);
-  const netLedgerAll = ledger.filter(e => !trackingOnlyNames.includes(e.payment_mode));
+  const trackingOnlyIds = new Set(bankAccounts.filter(a => a.include_in_balance === false).map(a => a.id));
+  // Net-cash ledger only: hide COMPANY ACCOUNT / tracking-only (by mode name OR bank_account_id)
+  // Also hard-exclude known tracking mode name so report stays clean even before bankAccounts load
+  const isTrackingEntry = (e) =>
+    trackingOnlyNames.includes(e.payment_mode) ||
+    e.payment_mode === "COMPANY ACCOUNT" ||
+    (e.bank_account_id && trackingOnlyIds.has(e.bank_account_id));
+  const netLedgerAll = ledger.filter(e => !isTrackingEntry(e));
   const filtLedger = netLedgerAll.filter(e =>
     (!startDate || e.entry_date >= startDate) && (!endDate || e.entry_date <= endDate)
   );
@@ -737,14 +744,7 @@ export default function Reports() {
                 <span style={{marginLeft:"auto", fontSize:12, color:"#64748b"}}>{cbEntries.length} entries</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
-                <div style={{ background:"#ecfdf5", borderRadius:10, padding:"14px 16px", border:"1px solid #a7f3d0" }}>
-                  <div style={{ fontSize:11, color:"#059669", fontWeight:700 }}>COMPANY TOTAL CREDITS (all time)</div>
-                  <div style={{ fontSize:20, fontWeight:800, color:"#047857", marginTop:4 }}>OMR {allTimeCredits.toFixed(3)}</div>
-                </div>
-                <div style={{ background:"#fef2f2", borderRadius:10, padding:"14px 16px", border:"1px solid #fecaca" }}>
-                  <div style={{ fontSize:11, color:"#dc2626", fontWeight:700 }}>COMPANY TOTAL DEBITS (all time)</div>
-                  <div style={{ fontSize:20, fontWeight:800, color:"#b91c1c", marginTop:4 }}>OMR {allTimeDebits.toFixed(3)}</div>
-                </div>
+                
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12, marginBottom: 12 }}>
                 <div style={{ background:"#eef2ff", borderRadius:10, padding:"12px 14px", border:"1px solid #c7d2fe" }}>
