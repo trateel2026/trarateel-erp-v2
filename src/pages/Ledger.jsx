@@ -184,10 +184,7 @@ export default function Ledger() {
 
   // Tracking-only account names (e.g. Deepu) — their entries are hidden from cashbook + totals
   const trackingOnlyNames = bankAccounts.filter(a => a.include_in_balance === false).map(a => a.account_name);
-  // Show ALL accounts in the list (including COMPANY ACCOUNT tracking entries)
-  const visibleEntries = entries;
-  // Net-cash subset for balance KPIs only
-  const netCashEntries = entries.filter(e => !trackingOnlyNames.includes(e.payment_mode));
+  const visibleEntries = entries.filter(e => !trackingOnlyNames.includes(e.payment_mode));
 
   const filtered = visibleEntries.filter(e =>
     (filter === "All double entries" || e.type === filter) &&
@@ -200,8 +197,8 @@ export default function Ledger() {
     (!startDate || e.entry_date >= startDate) && (!endDate || e.entry_date <= endDate)
   );
 
-  const totalIncome = netCashEntries.filter(e => e.type === "Credits (Income)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
-  const totalExpense = netCashEntries.filter(e => e.type === "Debits (Payouts)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const totalIncome = visibleEntries.filter(e => e.type === "Credits (Income)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const totalExpense = visibleEntries.filter(e => e.type === "Debits (Payouts)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
   const openingBals = bankAccounts.filter(a => a.include_in_balance !== false).reduce((s, a) => s + parseFloat(a.opening_balance || 0), 0);
   const netBalance = openingBals + totalIncome - totalExpense;
   const filtIncome = filtered.filter(e => e.type === "Credits (Income)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
