@@ -13,6 +13,7 @@ export default function Dashboard({ setPage }) {
   const [accountBalances, setAccountBalances] = useState({});
   const [payablesDue, setPayablesDue] = useState(0);
   const [recurringPending, setRecurringPending] = useState([]);
+  const [rentAlerts, setRentAlerts] = useState([]);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
 
@@ -89,6 +90,45 @@ export default function Dashboard({ setPage }) {
         return paidThis < parseFloat(r.amount)-0.001;
       });
       setRecurringPending(pending);
+      // Equipment rent due (within 7 days or overdue)
+      try {
+        const { data: eqs } = await supabase.from("equipment").select("*");
+        const { data: scheds } = await supabase.from("equipment_schedule").select("*");
+        const today = new Date(); today.setHours(0,0,0,0);
+        const alerts = [];
+        (eqs||[]).forEach(eq => {
+          const notes = eq.notes || "";
+          let due = null, amt = null;
+          const dm = notes.match(/\[RENT_DUE:(\d{4}-\d{2}-\d{2})\]/);
+          const am = notes.match(/\[RENT_AMT:([\d.]+)\]/);
+          if (dm) due = dm[1];
+          if (am) amt = parseFloat(am[1]);
+          if (!due) {
+            const m2 = notes.match(/DUE on (\d{2})\/(\d{2})\/(\d{4})/i);
+            if (m2) due = `${m2[3]}-${m2[2]}-${m2[1]}`;
+          }
+          if (!due) {
+            const sc = (scheds||[]).filter(s => s.equipment_id === eq.id && s.end_date).sort((a,b)=>(b.end_date||"").localeCompare(a.end_date||""));
+            if (sc[0]) due = sc[0].end_date;
+          }
+          if (!due) return;
+          const t = new Date(due + "T00:00:00");
+          const days = Math.round((t - today) / 86400000);
+          if (days <= 7) {
+            alerts.push({
+              name: eq.name,
+              qty: eq.quantity || 1,
+              due,
+              days,
+              amt: amt != null ? amt : (parseFloat(eq.daily_rate||0) * parseFloat(eq.quantity||1)),
+              operator: eq.operator || "",
+            });
+          }
+        });
+        alerts.sort((a,b)=>a.days-b.days);
+        setRentAlerts(alerts);
+      } catch { setRentAlerts([]); }
+
     } catch { setPayablesDue(0); }
 
     setLoading(false);
@@ -191,7 +231,25 @@ export default function Dashboard({ setPage }) {
         </div>
       )}
 
-      {/* KPI Cards */}
+      
+      {/* Equipment rent due alert */}
+      {!loading && rentAlerts.length > 0 && (
+        <div style={{ background: rentAlerts.some(a=>a.days<0) ? "linear-gradient(135deg,#fef2f2,#fff)" : "linear-gradient(135deg,#fffbeb,#fff)", border: `1px solid ${rentAlerts.some(a=>a.days<0)?"#fecaca":"#fde68a"}`, borderRadius: 14, padding: "14px 18px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 13, color: rentAlerts.some(a=>a.days<0)?"#b91c1c":"#b45309" }}>
+              ⏰ {rentAlerts.length} equipment rent{rentAlerts.length>1?"s":""} due soon
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+              {rentAlerts.map(a => `${a.name}×${a.qty} (${a.days<0?Math.abs(a.days)+"d overdue":a.days===0?"today":"in "+a.days+"d"})`).join(" · ")}
+            </div>
+          </div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: rentAlerts.some(a=>a.days<0)?"#dc2626":"#d97706" }}>
+            OMR {rentAlerts.reduce((s,a)=>s+(a.amt||0),0).toFixed(3)}
+          </div>
+        </div>
+      )}
+
+{/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 16, marginBottom: 24 }}>
         {[
           { label: "NET CASH BALANCE", value: loading ? "..." : `${netBalance.toFixed(3)}`, unit: "OMR", sub: netBalance >= 0 ? "SURPLUS  Core reserves" : "DEFICIT  Check cashbook", color: "#10b981", icon: "🏦" },

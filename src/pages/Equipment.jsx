@@ -1,9 +1,37 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAdmin } from "../context/AdminContext";
-const STATUSES=["Available","In Use","Maintenance","Retired"];
+const STATUSES=["Available","In Use","Maintenance","Retired","On Hire"];
 const DEFAULT_EQUIP=["Excavator","Loader","Crane","Truck","Mixer","Compactor","Generator","Welder","JCB","Dump Truck","Scaffolding","Roller","Bulldozer","Forklift","Water Tanker","Concrete Pump"];
-const empty=()=>({name:"",customName:"",quantity:"1",status:"Available",current_site:"",customSite:"",daily_rate:"",notes:""});
+const empty=()=>({name:"",customName:"",quantity:"1",status:"Available",current_site:"",customSite:"",daily_rate:"",notes:"",rent_due:"",rent_amount:""});
+
+
+/** Parse rent due meta from notes. Tags: [RENT_DUE:YYYY-MM-DD] [RENT_AMT:120] */
+function parseRentMeta(notes="") {
+  const dueM = String(notes).match(/\[RENT_DUE:(\d{4}-\d{2}-\d{2})\]/);
+  const amtM = String(notes).match(/\[RENT_AMT:([\d.]+)\]/);
+  let due = dueM ? dueM[1] : null;
+  let amt = amtM ? parseFloat(amtM[1]) : null;
+  if (!due) {
+    const m2 = String(notes).match(/DUE on (\d{2})\/(\d{2})\/(\d{4})/i);
+    if (m2) due = `${m2[3]}-${m2[2]}-${m2[1]}`;
+    const m3 = String(notes).match(/DUE on (\d{4}-\d{2}-\d{2})/i);
+    if (m3) due = m3[1];
+  }
+  return { due, amt };
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const t = new Date(dateStr + "T00:00:00");
+  const n = new Date(); n.setHours(0,0,0,0);
+  return Math.round((t - n) / 86400000);
+}
+function buildNotes(base, rentDue, rentAmt) {
+  let n = String(base || "").replace(/\[RENT_DUE:[^\]]*\]/g, "").replace(/\[RENT_AMT:[^\]]*\]/g, "").trim();
+  if (rentDue) n = `${n} [RENT_DUE:${rentDue}]`.trim();
+  if (rentAmt !== "" && rentAmt !== null && rentAmt !== undefined) n = `${n} [RENT_AMT:${rentAmt}]`.trim();
+  return n;
+}
 
 export default function Equipment(){
   const{isAdmin:r,canEdit,confirmAction,logActivity}=useAdmin();const isAdmin=canEdit("equipment");
@@ -22,6 +50,22 @@ export default function Equipment(){
   };
   useEffect(()=>{load();},[]);
   const showMsg=(t)=>{setMsg(t);setTimeout(()=>setMsg(""),3000);};
+
+  // Rent reminders: due within 7 days or overdue
+  const rentAlerts = equip.map(eq => {
+    const meta = parseRentMeta(eq.notes || "");
+    // Fallback: latest schedule end_date for this equipment
+    let due = meta.due;
+    if (!due) {
+      const scheds = schedules.filter(s => s.equipment_id === eq.id && s.end_date).sort((a,b) => (b.end_date||"").localeCompare(a.end_date||""));
+      if (scheds[0]) due = scheds[0].end_date;
+    }
+    if (!due) return null;
+    const d = daysUntil(due);
+    if (d === null || d > 7) return null;
+    return { eq, due, days: d, amt: meta.amt != null ? meta.amt : parseFloat(eq.daily_rate||0) * parseFloat(eq.quantity||1) };
+  }).filter(Boolean).sort((a,b) => a.days - b.days);
+
   const inp={border:"1px solid #e2e8f0",borderRadius:8,padding:"9px 12px",fontSize:13,width:"100%",boxSizing:"border-box",outline:"none",background:"#fff"};
 
   // All known equipment names (defaults + previously added)
@@ -32,7 +76,7 @@ export default function Equipment(){
   const getFinalSite=()=>form.current_site==="__custom__"?form.customSite.trim():form.current_site;
 
   const saveEquip=async()=>{const finalName=getFinalName();if(!finalName){showMsg("❌ Equipment name required");return;}setSaving(true);
-    const row={name:finalName,quantity:parseFloat(form.quantity)||1,status:form.status,current_site:getFinalSite(),daily_rate:parseFloat(form.daily_rate)||0,notes:form.notes};
+    const row={name:finalName,quantity:parseFloat(form.quantity)||1,status:form.status,current_site:getFinalSite(),daily_rate:parseFloat(form.daily_rate)||0,notes: buildNotes(form.notes, form.rent_due, form.rent_amount)};
     if(editId){await supabase.from("equipment").update(row).eq("id",editId);logActivity("Edited equipment",finalName,"Equipment");}
     else{await supabase.from("equipment").insert(row);logActivity("Added equipment",finalName,"Equipment");}
     showMsg("✅ Saved!");setShowForm(false);setForm(empty());setEditId(null);await load();setSaving(false);};
@@ -79,6 +123,22 @@ export default function Equipment(){
       </div>
       <div style={{display:"flex",gap:4,marginBottom:16}}>{[["fleet","🚜 Fleet"],["schedule","📅 History"]].map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"10px 20px",borderRadius:"10px 10px 0 0",border:"none",cursor:"pointer",fontSize:13,fontWeight:700,background:tab===id?"#6366f1":"#f1f5f9",color:tab===id?"#fff":"#64748b"}}>{label}</button>))}</div>
 
+      {rentAlerts.length > 0 && (
+        <div style={{marginBottom:14,padding:"12px 16px",borderRadius:12,background:rentAlerts.some(a=>a.days<0)?"#fef2f2":"#fffbeb",border:`1px solid ${rentAlerts.some(a=>a.days<0)?"#fecaca":"#fde68a"}`}}>
+          <div style={{fontWeight:800,fontSize:13,color:rentAlerts.some(a=>a.days<0)?"#b91c1c":"#b45309",marginBottom:6}}>
+            ⏰ Equipment rent reminder
+          </div>
+          {rentAlerts.map((a,i)=>(
+            <div key={i} style={{fontSize:12,color:"#334155",marginTop:4}}>
+              <b>{a.eq.name}</b> × {a.eq.quantity||1}
+              {" · "}Due <b>{a.due}</b>
+              {" · "}{a.days < 0 ? <span style={{color:"#dc2626",fontWeight:700}}>{Math.abs(a.days)}d overdue</span> : a.days === 0 ? <span style={{color:"#dc2626",fontWeight:700}}>Due today</span> : <span style={{color:"#d97706"}}>in {a.days} day{a.days>1?"s":""}</span>}
+              {a.amt ? ` · OMR ${Number(a.amt).toFixed(3)}` : ""}
+              {a.eq.operator ? ` · ${a.eq.operator}` : ""}
+            </div>
+          ))}
+        </div>
+      )}
       {tab==="fleet"&&(<div>
         <div style={{display:"flex",gap:6,marginBottom:14}}>{["All",...STATUSES].map(s=>(<button key={s} onClick={()=>setFilterStatus(s)} style={{padding:"6px 14px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:filterStatus===s?"#6366f1":"#f1f5f9",color:filterStatus===s?"#fff":"#64748b"}}>{s}</button>))}</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
@@ -95,7 +155,7 @@ export default function Equipment(){
                   <button onClick={()=>{setShowTransfer(eq.id);setTransferSite("");setTransferCustom("");}} style={{flex:1,background:"#fffbeb",color:"#92400e",border:"1px solid #fcd34d",borderRadius:8,padding:"7px",fontSize:12,fontWeight:700,cursor:"pointer"}}>🔄 Transfer</button>
                   <button onClick={async()=>{await supabase.from("equipment").update({quantity:"1",status:"Available",current_site:""}).eq("id",eq.id);await supabase.from("equipment_schedule").insert({equipment_id:eq.id,site:eq.current_site,start_date:new Date().toISOString().split("T")[0],notes:"Released"});logActivity("Released",eq.name,"Equipment");showMsg("✅ Released");await load();}} style={{background:"#ecfdf5",color:"#10b981",border:"1px solid #86efac",borderRadius:8,padding:"7px",fontSize:12,fontWeight:700,cursor:"pointer"}}>✅ Release</button>
                 </>}
-                <button onClick={()=>{const isInList=equipNames.includes(eq.name);setForm({name:isInList?eq.name:"__custom__",customName:isInList?"":eq.name,quantity:String(eq.quantity||1),status:eq.status,current_site:sites.includes(eq.current_site)?eq.current_site:(eq.current_site?"__custom__":""),customSite:sites.includes(eq.current_site)?"":eq.current_site||"",daily_rate:String(eq.daily_rate||""),notes:eq.notes||""});setEditId(eq.id);setShowForm(true);}} style={{background:"#eef2ff",color:"#6366f1",border:"none",borderRadius:8,padding:"7px 10px",fontSize:12,cursor:"pointer"}}>✏️</button>
+                <button onClick={()=>{const isInList=equipNames.includes(eq.name);setForm({name:isInList?eq.name:"__custom__",customName:isInList?"":eq.name,quantity:String(eq.quantity||1),status:eq.status,current_site:sites.includes(eq.current_site)?eq.current_site:(eq.current_site?"__custom__":""),customSite:sites.includes(eq.current_site)?"":eq.current_site||"",daily_rate:String(eq.daily_rate||""),notes:(()=>{const m=parseRentMeta(eq.notes||"");return String(eq.notes||"").replace(/\[RENT_DUE:[^\]]*\]/g,"").replace(/\[RENT_AMT:[^\]]*\]/g,"").trim();})(),rent_due:(parseRentMeta(eq.notes||"").due||""),rent_amount:(()=>{const m=parseRentMeta(eq.notes||"");return m.amt!=null?String(m.amt):"";})()});setEditId(eq.id);setShowForm(true);}} style={{background:"#eef2ff",color:"#6366f1",border:"none",borderRadius:8,padding:"7px 10px",fontSize:12,cursor:"pointer"}}>✏️</button>
                 <button onClick={()=>deleteEquip(eq)} style={{background:"#fef2f2",color:"#ef4444",border:"none",borderRadius:8,padding:"7px 10px",fontSize:12,cursor:"pointer"}}>🗑</button>
               </div>)}
             </div>);})}
@@ -128,6 +188,14 @@ export default function Equipment(){
         <div style={{marginBottom:12}}>
           <div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Current Site</div>
           <SiteSelect value={form.current_site} onChange={v=>setForm(p=>({...p,current_site:v,customSite:""}))} customValue={form.customSite} onCustomChange={v=>setForm(p=>({...p,customSite:v}))}/>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          <div><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Rent due date (monthly hire)</div>
+            <input type="date" value={form.rent_due||""} onChange={e=>setForm(p=>({...p,rent_due:e.target.value}))} style={inp} placeholder="Next rent due"/>
+          </div>
+          <div><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Monthly rent (OMR)</div>
+            <input type="number" step="0.001" value={form.rent_amount||""} onChange={e=>setForm(p=>({...p,rent_amount:e.target.value}))} style={inp} placeholder="e.g. 120"/>
+          </div>
         </div>
         <div style={{marginBottom:12}}><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Notes</div><input value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} style={inp}/></div>
         <div style={{display:"flex",gap:10}}><button onClick={saveEquip} disabled={saving} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:8,padding:"10px 22px",fontSize:13,fontWeight:700,cursor:"pointer"}}>{saving?"Saving...":"💾 Save"}</button><button onClick={()=>setShowForm(false)} style={{background:"#f1f5f9",color:"#64748b",border:"none",borderRadius:8,padding:"10px 14px",fontSize:13,cursor:"pointer"}}>Cancel</button></div>
