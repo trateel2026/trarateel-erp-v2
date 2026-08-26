@@ -91,6 +91,59 @@ export default function Equipment(){
     showMsg("✅ Saved!");setShowForm(false);setForm(empty());setEditId(null);await load();setSaving(false);};
   const deleteEquip=(item)=>{confirmAction(`Delete "${item.name}"?`,async()=>{await supabase.from("equipment").delete().eq("id",item.id);logActivity("Deleted",item.name,"Equipment");showMsg("✅ Deleted");await load();});};
 
+  /** Write off worn/damaged/consumed qty (gloves etc). Keeps history in schedule. */
+  const writeOff = (eq) => {
+    if (!isAdmin) { setShowLogin(true); return; }
+    const maxQ = parseFloat(eq.quantity || 1);
+    const raw = prompt(`Write-off quantity for "${eq.name}"\n(Current qty: ${maxQ})\nEnter how many worn out / used up:`, "1");
+    if (raw === null) return;
+    const n = parseFloat(raw);
+    if (!n || n <= 0) { showMsg("❌ Invalid quantity"); return; }
+    if (n > maxQ) { showMsg("❌ Cannot exceed current quantity"); return; }
+    const reason = prompt("Reason (optional):", "Worn out / consumed") || "Worn out / consumed";
+    confirmAction(`Write off ${n} × ${eq.name}?\nReason: ${reason}`, async () => {
+      const left = parseFloat((maxQ - n).toFixed(3));
+      const status = left <= 0 ? "Retired" : (eq.status || "In Use");
+      await supabase.from("equipment").update({ quantity: left <= 0 ? 0 : left, status }).eq("id", eq.id);
+      await supabase.from("equipment_schedule").insert({
+        equipment_id: eq.id,
+        site: eq.current_site || "",
+        start_date: new Date().toISOString().split("T")[0],
+        notes: `WRITE-OFF ×${n} · ${reason} · remaining ${left <= 0 ? 0 : left}`,
+      });
+      logActivity("Write-off", `${eq.name} ×${n} (${reason})`, "Equipment");
+      showMsg(`✅ Wrote off ${n}. Remaining: ${left <= 0 ? 0 : left}`);
+      await load();
+    });
+  };
+
+  /** Return rented equipment to supplier — ends hire, clears rent due. */
+  const returnRental = (eq) => {
+    if (!isAdmin) { setShowLogin(true); return; }
+    confirmAction(`Mark "${eq.name}" as RETURNED to supplier (${eq.operator || "vendor"})?\nRent tracking will be closed.`, async () => {
+      let notes = String(eq.notes || "")
+        .replace(/\[RENT_DUE:[^\]]*\]/g, "")
+        .replace(/\[RENT_AMT:[^\]]*\]/g, "")
+        .trim();
+      notes = `${notes} [RETURNED:${new Date().toISOString().split("T")[0]}]`.trim();
+      await supabase.from("equipment").update({
+        status: "Retired",
+        notes,
+        // keep quantity for history; operator stays for audit
+      }).eq("id", eq.id);
+      await supabase.from("equipment_schedule").insert({
+        equipment_id: eq.id,
+        site: eq.current_site || "",
+        start_date: new Date().toISOString().split("T")[0],
+        end_date: new Date().toISOString().split("T")[0],
+        notes: `RETURNED to supplier · ${eq.operator || ""} · hire closed`,
+      });
+      logActivity("Rental returned", `${eq.name} → ${eq.operator || "supplier"}`, "Equipment");
+      showMsg("✅ Rental returned & closed");
+      await load();
+    });
+  };
+
   const doAssign=async()=>{const site=schedSite==="__custom__"?schedCustom.trim():schedSite;if(!site){showMsg("❌ Select site");return;}setSaving(true);
     await supabase.from("equipment_schedule").insert({equipment_id:showSched,site,start_date:new Date().toISOString().split("T")[0],notes:"Assigned"});
     await supabase.from("equipment").update({status:"In Use",current_site:site}).eq("id",showSched);
@@ -189,6 +242,8 @@ export default function Equipment(){
                   <button onClick={async()=>{await supabase.from("equipment").update({quantity:"1",status:"Available",current_site:""}).eq("id",eq.id);await supabase.from("equipment_schedule").insert({equipment_id:eq.id,site:eq.current_site,start_date:new Date().toISOString().split("T")[0],notes:"Released"});logActivity("Released",eq.name,"Equipment");showMsg("✅ Released");await load();}} style={{background:"#ecfdf5",color:"#10b981",border:"1px solid #86efac",borderRadius:8,padding:"7px",fontSize:12,fontWeight:700,cursor:"pointer"}}>✅ Release</button>
                 </>}
                 <button onClick={()=>{const isInList=equipNames.includes(eq.name);setForm({name:isInList?eq.name:"__custom__",customName:isInList?"":eq.name,quantity:String(eq.quantity||1),status:eq.status,current_site:sites.includes(eq.current_site)?eq.current_site:(eq.current_site?"__custom__":""),customSite:sites.includes(eq.current_site)?"":eq.current_site||"",daily_rate:String(eq.daily_rate||""),notes:(()=>{const m=parseRentMeta(eq.notes||"");return String(eq.notes||"").replace(/\[RENT_DUE:[^\]]*\]/g,"").replace(/\[RENT_AMT:[^\]]*\]/g,"").trim();})(),rent_due:(parseRentMeta(eq.notes||"").due||""),rent_amount:(()=>{const m=parseRentMeta(eq.notes||"");return m.amt!=null?String(m.amt):"";})()});setEditId(eq.id);setShowForm(true);}} style={{background:"#eef2ff",color:"#6366f1",border:"none",borderRadius:8,padding:"7px 10px",fontSize:12,cursor:"pointer"}}>✏️</button>
+                <button onClick={()=>writeOff(eq)} style={{background:"#fff7ed",color:"#c2410c",border:"1px solid #fed7aa",borderRadius:8,padding:"7px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}} title="Worn out / consumed">📉 Write-off</button>
+                {isRental(eq)&&eq.status!=="Retired"&&<button onClick={()=>returnRental(eq)} style={{background:"#f0fdf4",color:"#15803d",border:"1px solid #bbf7d0",borderRadius:8,padding:"7px 10px",fontSize:12,fontWeight:700,cursor:"pointer"}}>↩️ Return rent</button>}
                 <button onClick={()=>deleteEquip(eq)} style={{background:"#fef2f2",color:"#ef4444",border:"none",borderRadius:8,padding:"7px 10px",fontSize:12,cursor:"pointer"}}>🗑</button>
               </div>)}
             </div>);})}
