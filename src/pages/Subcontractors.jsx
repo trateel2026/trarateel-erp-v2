@@ -228,6 +228,85 @@ export default function Subcontractors() {
     setPayMilestoneId("");
   };
 
+  /** Sync missing cashbook subcontractor payments into Payment Schedule milestones. */
+  const syncFromCashbook = async () => {
+    if (!isAdmin) { setShowLogin(true); return; }
+    if (!selectedWork) return;
+    const name = selectedWork.name || "";
+    // Fetch ledger debits for this subcontractor
+    const { data: led } = await supabase.from("ledger")
+      .select("*")
+      .eq("type", "Debits (Payouts)")
+      .or(`payee.ilike.%${name}%,description.ilike.%${name}%,category.eq.Subcontractor`)
+      .order("entry_date");
+    const rows = (led || []).filter(r => {
+      const payee = (r.payee || "").toLowerCase();
+      const desc = (r.description || "").toLowerCase();
+      const n = name.toLowerCase();
+      return payee.includes(n) || desc.includes(n) || (r.category === "Subcontractor" && (payee.includes(n) || desc.includes("steel")));
+    });
+    const existing = milestones || [];
+    const used = new Set();
+    let added = 0;
+    const newMs = [...existing];
+    for (const r of rows) {
+      const amt = parseFloat(r.amount || 0);
+      if (amt <= 0) continue;
+      const date = r.entry_date || "";
+      const ref = r.ref_voucher || "";
+      // Match existing milestone by payment_date+amount or notes/ref containing ref
+      const match = existing.find(m => {
+        const key = `${m.id}`;
+        if (used.has(key)) return false;
+        const sameAmt = Math.abs(parseFloat(m.paid_amount || m.amount || 0) - amt) < 0.001;
+        const sameDate = (m.payment_date || "") === date;
+        const refHit = ref && ((m.notes || "").includes(ref) || (m.label || "").includes(ref));
+        return (sameAmt && sameDate) || refHit;
+      });
+      if (match) { used.add(match.id); continue; }
+      // Also skip if an unused milestone has same amount+date already among new ones
+      const already = newMs.find(m =>
+        Math.abs(parseFloat(m.paid_amount || m.amount || 0) - amt) < 0.001 &&
+        (m.payment_date || "") === date &&
+        (ref ? ((m.notes || "").includes(ref) || (m.label || "").includes(ref)) : true)
+      );
+      if (already) continue;
+      const label = `Payment ${date.slice(8,10)}/${date.slice(5,7)} — Transfer ${amt}${ref ? ` (${ref})` : ""}`;
+      const payload = {
+        subcontractor_id: selectedWork.id,
+        title: "",
+        label,
+        amount: amt,
+        paid_amount: amt,
+        received: amt,
+        status: "Completed",
+        pct_complete: 100,
+        payment_date: date || null,
+        sort_order: newMs.length + 1,
+        bank_account_id: r.bank_account_id || null,
+        notes: `Synced from cashbook${ref ? " · " + ref : ""} · ${r.description || ""}`.slice(0, 240),
+      };
+      const { data, error } = await supabase.from("sub_milestones").insert(payload).select().single();
+      if (!error && data) {
+        newMs.push(data);
+        added++;
+      }
+    }
+    const totalPaid = newMs.reduce((s, m) => s + parseFloat(m.paid_amount || m.amount || 0), 0);
+    await supabase.from("subcontractors").update({
+      paid: totalPaid,
+      notes: `Payments total OMR ${totalPaid}. Schedule synced from cashbook.`,
+    }).eq("id", selectedWork.id);
+    setMilestones(newMs);
+    setSubs(subs.map(s => s.id === selectedWork.id ? { ...s, paid: totalPaid } : s));
+    setSelectedWork({ ...selectedWork, paid: totalPaid });
+    setPaidEdit(String(totalPaid));
+    alert(added > 0
+      ? `✅ Synced ${added} payment(s) from Cashbook. Total paid: OMR ${totalPaid.toFixed(3)}`
+      : `✅ Schedule already matches Cashbook. Total paid: OMR ${totalPaid.toFixed(3)}`);
+  };
+
+
   const deleteWork = (id) => {
     if (!isAdmin) { setShowLogin(true); return; }
     confirmAction("Delete this work contract and all milestones?", async () => {
@@ -463,7 +542,10 @@ export default function Subcontractors() {
                 <div style={{ color:"#64748b",fontSize:12,marginTop:2 }}>{selectedWork.name} · {selectedWork.specialty}</div>
               </div>
               <div style={{ display:"flex",gap:8 }}>
-                {isAdmin&&<button onClick={addMilestone} style={{ background:"#eef2ff",color:"#6366f1",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:600 }}>+ Milestone</button>}
+                {isAdmin&&<>
+                  <button onClick={syncFromCashbook} style={{ background:"#ecfdf5",color:"#059669",border:"1px solid #a7f3d0",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:600,marginRight:8 }}>↻ Sync from Cashbook</button>
+                  <button onClick={addMilestone} style={{ background:"#eef2ff",color:"#6366f1",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:600 }}>+ Milestone</button>
+                </>}
                 {isAdmin&&<button onClick={()=>deleteWork(selectedWork.id)} style={{ background:"#fef2f2",color:"#ef4444",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12 }}>🗑</button>}
               </div>
             </div>
