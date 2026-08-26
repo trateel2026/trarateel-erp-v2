@@ -47,6 +47,20 @@ function getSalaryPeriods() {
   return out;
 }
 
+/** Period immediately before the given period (26→25 cycle). */
+function getPreviousPeriod(period) {
+  // period.start is YYYY-MM-26
+  const [y, m] = period.start.split("-").map(Number);
+  // previous period started one month earlier on the 26th
+  let pm = m - 2; // m is 1-based month of start; go back one more month → 0-based for getPeriodDates
+  let py = y;
+  // getPeriodDates expects 0-based month
+  // start month 1-based = m, previous start month 1-based = m-1
+  let startMonth0 = m - 2; // 0-based month for previous period start
+  if (startMonth0 < 0) { startMonth0 += 12; py = y - 1; }
+  return getPeriodDates(py, startMonth0);
+}
+
 // Get all dates in a salary period (26th to 25th)
 function getPeriodDays(period) {
   const days = [];
@@ -516,20 +530,43 @@ export default function Payroll() {
     const food = pr ? parseFloat(pr.food_deduction || 0) : parseFloat(df.food || 0);
     const other = pr ? parseFloat(pr.other_deduction || 0) : parseFloat(df.other || 0);
     const incentive = pr ? parseFloat(pr.incentive || 0) : parseFloat(df.incentive || 0);
-    const openingBal = emp.opening_balance !== null && emp.opening_balance !== undefined ? parseFloat(emp.opening_balance) : 0;
+    // --- Auto carry-forward: all unpaid earnings before this period ---
+    // Gross from attendance before selectedPeriod.start
+    const priorAtt = attendance.filter(a => {
+      if (a.employee_id !== emp.id) return false;
+      const d = a.att_date || a.work_date;
+      return d && d < selectedPeriod.start;
+    });
+    const priorByDate = {};
+    priorAtt.forEach(a => { priorByDate[a.att_date || a.work_date] = a; });
+    const priorHours = Object.values(priorByDate).reduce((s, a) => s + parseFloat(a.hours_worked || 0), 0);
+    const priorDays = parseFloat((priorHours / WORK_HOURS).toFixed(2));
+    const priorGross = parseFloat((dailyRate * priorDays).toFixed(3));
+    // Payments dated before this period
+    const empPaymentsAll = payments.filter(p => p.employee_id === emp.id);
+    const priorPaid = empPaymentsAll
+      .filter(p => p.payment_date && p.payment_date < selectedPeriod.start)
+      .reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    // Seed from employee.opening_balance only as legacy adjustment (manual arrears before attendance started)
+    const seedBal = emp.opening_balance !== null && emp.opening_balance !== undefined ? parseFloat(emp.opening_balance) : 0;
+    // Prefer live prior balance; if no prior attendance/payments, fall back to seed only
+    const autoCarry = parseFloat((priorGross - priorPaid).toFixed(3));
+    // Avoid double-counting: if we already set opening_balance FROM prior period, don't add both.
+    // Use autoCarry when there is any prior attendance; otherwise use seedBal.
+    const openingBal = priorHours > 0 || priorPaid > 0 ? autoCarry : seedBal;
     const netSalary = parseFloat((grossSalary - advance - food - other + incentive).toFixed(3));
     // Match payments by payroll_id OR by unlinked payment within the period
-    const empPayments = payments.filter(p => p.employee_id === emp.id);
+    const empPayments = empPaymentsAll;
     const periodPayments = empPayments.filter(p => {
       if (pr && p.payroll_id === pr.id) return true;
       if (!p.payroll_id && p.payment_date >= selectedPeriod.start && p.payment_date <= selectedPeriod.end) return true;
       return false;
     });
-    const finalPayments = periodPayments.length > 0 ? periodPayments : empPayments.filter(p => !p.payroll_id);
+    const finalPayments = periodPayments.length > 0 ? periodPayments : empPayments.filter(p => !p.payroll_id && p.payment_date >= selectedPeriod.start && p.payment_date <= selectedPeriod.end);
     const paidAmt = finalPayments.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
     const paidAdvance = finalPayments.filter(p => p.payment_type === "Advance").reduce((s, p) => s + parseFloat(p.amount || 0), 0);
     const paidSalary = finalPayments.filter(p => p.payment_type !== "Advance").reduce((s, p) => s + parseFloat(p.amount || 0), 0);
-    // Total balance = this period net + opening balance (previous arrears)
+    // Total balance = this period net + carried previous arrears − paid this period
     const balance = parseFloat((netSalary + openingBal - paidAmt).toFixed(3));
     return { totalHours, totalDays, totalOt, totalLt, grossSalary, advance, food, other, incentive, netSalary, openingBal, paidAmt, paidAdvance, paidSalary, balance, payrollRecord: pr };
   };
