@@ -78,68 +78,161 @@ const Field = ({label,children}) => <div><div style={{fontSize:12,color:"#64748b
 
 function printSubcontractorsReport(subs, milestonesBySub = {}, company = {}) {
   const coName = company.company_name || "TRATEEL AL NAJAH FOR TRADING";
+  const coNameAr = company.company_name_ar || "";
   const coAddr = company.company_address || "Sultanate of Oman";
-  const now = new Date().toLocaleString();
+  const coVat = company.company_vat_no || company.company_tax_no || "";
+  const logo = company.company_logo || "";
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
   const groups = {};
   (subs || []).forEach(s => {
     const k = s.name || "Unknown";
     if (!groups[k]) groups[k] = [];
     groups[k].push(s);
   });
+  const names = Object.keys(groups).sort();
+  const grandContract = (subs || []).reduce((t, w) => t + parseFloat(w.contract_amount || 0), 0);
+  const grandPaid = (subs || []).reduce((t, w) => t + parseFloat(w.paid || 0), 0);
+
   let body = "";
-  Object.keys(groups).sort().forEach(name => {
+  names.forEach((name, gi) => {
     const works = groups[name];
     const totalContract = works.reduce((t, w) => t + parseFloat(w.contract_amount || 0), 0);
     const totalPaid = works.reduce((t, w) => t + parseFloat(w.paid || 0), 0);
-    body += `<div class="block">
-      <h2>${name}</h2>
-      <div class="meta">Works: ${works.length} · Contract: OMR ${totalContract.toFixed(3)} · Paid: OMR ${totalPaid.toFixed(3)}</div>`;
-    works.forEach(w => {
+    body += `<div class="contractor">
+      <div class="c-hd">
+        <div>
+          <div class="c-name">${name}</div>
+          <div class="c-sub">${works.length} work contract${works.length > 1 ? "s" : ""} · Phone: ${works[0].phone || "—"}</div>
+        </div>
+        <div class="c-totals">
+          <div><span class="lbl">Contract</span><span class="val">OMR ${totalContract.toFixed(3)}</span></div>
+          <div><span class="lbl">Paid</span><span class="val paid">OMR ${totalPaid.toFixed(3)}</span></div>
+        </div>
+      </div>`;
+    works.forEach((w) => {
+      const ms = (milestonesBySub[w.id] || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      const msSum = ms.reduce((s, m) => s + parseFloat(m.paid_amount || m.amount || 0), 0);
       body += `<div class="work">
-        <div><b>Project:</b> ${w.project || "—"} · <b>Specialty:</b> ${w.specialty || "—"} · <b>Status:</b> ${w.status || "—"}</div>
-        <div><b>Contract:</b> OMR ${parseFloat(w.contract_amount || 0).toFixed(3)} · <b>Paid:</b> OMR ${parseFloat(w.paid || 0).toFixed(3)} · <b>Phone:</b> ${w.phone || "—"}</div>`;
-      const ms = milestonesBySub[w.id] || [];
+        <div class="w-hd">
+          <div><b>${w.project || "—"}</b> · ${w.specialty || "—"} · <span class="pill">${w.status || "Active"}</span></div>
+          <div class="w-amt">Contract OMR ${parseFloat(w.contract_amount || 0).toFixed(3)} · Paid OMR ${parseFloat(w.paid || 0).toFixed(3)}</div>
+        </div>`;
       if (ms.length) {
-        body += `<table><thead><tr><th>#</th><th>Schedule / Milestone</th><th>Amount</th><th>Paid</th><th>Date</th><th>Status</th></tr></thead><tbody>`;
+        body += `<table>
+          <thead><tr>
+            <th style="width:36px">#</th>
+            <th>Payment schedule / milestone</th>
+            <th style="width:90px" class="r">Amount</th>
+            <th style="width:90px" class="r">Paid</th>
+            <th style="width:88px">Date</th>
+            <th style="width:90px">Status</th>
+          </tr></thead><tbody>`;
         ms.forEach((m, i) => {
+          const stt = m.status || "—";
+          const stColor = stt === "Completed" ? "#059669" : "#b45309";
           body += `<tr>
-            <td>${i + 1}</td>
+            <td class="c">${i + 1}</td>
             <td>${m.label || m.title || "Milestone"}</td>
-            <td style="text-align:right">${parseFloat(m.amount || 0).toFixed(3)}</td>
-            <td style="text-align:right">${parseFloat(m.paid_amount || m.amount || 0).toFixed(3)}</td>
-            <td>${m.payment_date || "—"}</td>
-            <td>${m.status || "—"}</td>
+            <td class="r num">${parseFloat(m.amount || 0).toFixed(3)}</td>
+            <td class="r num">${parseFloat(m.paid_amount || m.amount || 0).toFixed(3)}</td>
+            <td class="c">${m.payment_date || "—"}</td>
+            <td class="c"><span style="color:${stColor};font-weight:700">${stt}</span></td>
           </tr>`;
         });
+        body += `<tr class="sum"><td></td><td><b>Schedule total</b></td><td></td><td class="r num"><b>${msSum.toFixed(3)}</b></td><td colspan="2"></td></tr>`;
         body += `</tbody></table>`;
       } else {
-        body += `<div class="meta">No payment schedule recorded.</div>`;
+        body += `<div class="no-ms">No payment schedule recorded</div>`;
       }
       body += `</div>`;
     });
     body += `</div>`;
   });
+
   const w = window.open("", "_blank");
   if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><title>Subcontractors Report</title>
+  w.document.write(`<!DOCTYPE html><html><head>
+  <meta charset="utf-8"/>
+  <title>Subcontractors Report — ${coName}</title>
   <style>
-    body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;font-size:12px}
-    h1{font-size:18px;margin:0 0 4px}
-    h2{font-size:15px;margin:0 0 6px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:4px}
-    .meta{color:#64748b;font-size:11px;margin-bottom:8px}
-    .block{margin-bottom:22px;page-break-inside:avoid}
-    .work{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin:8px 0}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th{background:#0f172a;color:#fff;padding:6px 8px;text-align:left;font-size:10px}
-    td{padding:6px 8px;border-bottom:1px solid #e2e8f0}
-    tr:nth-child(even){background:#fff}
-    @media print{button{display:none} body{padding:10px}}
+    *{box-sizing:border-box}
+    body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;margin:0;padding:0;color:#0f172a;background:#f1f5f9;font-size:12px;line-height:1.45}
+    .page{max-width:980px;margin:0 auto;background:#fff;padding:28px 32px 40px}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #0f172a;padding-bottom:16px;margin-bottom:18px}
+    .hdr-left{display:flex;gap:14px;align-items:center}
+    .logo{height:52px;object-fit:contain}
+    .co-name{font-size:18px;font-weight:800;margin:0}
+    .co-ar{font-size:13px;color:#475569;margin-top:2px}
+    .co-meta{font-size:11px;color:#64748b;margin-top:4px}
+    .doc-box{text-align:right}
+    .doc-title{font-size:15px;font-weight:800;color:#4f46e5;text-transform:uppercase;letter-spacing:0.04em}
+    .doc-sub{font-size:11px;color:#64748b;margin-top:4px}
+    .kpis{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+    .kpi{flex:1;min-width:130px;background:linear-gradient(180deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px}
+    .kpi-l{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase}
+    .kpi-v{font-size:20px;font-weight:800;margin-top:2px}
+    .contractor{margin-bottom:24px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;page-break-inside:avoid}
+    .c-hd{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;flex-wrap:wrap}
+    .c-name{font-size:15px;font-weight:800}
+    .c-sub{font-size:11px;opacity:0.75;margin-top:2px}
+    .c-totals{display:flex;gap:18px;align-items:center}
+    .c-totals .lbl{display:block;font-size:9px;text-transform:uppercase;opacity:0.7}
+    .c-totals .val{font-size:14px;font-weight:800}
+    .c-totals .paid{color:#6ee7b7}
+    .work{padding:12px 14px;border-top:1px solid #e2e8f0}
+    .work:nth-child(even){background:#fafbfc}
+    .w-hd{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:12px}
+    .w-amt{color:#64748b;font-size:11px}
+    .pill{display:inline-block;background:#eef2ff;color:#4338ca;padding:1px 8px;border-radius:999px;font-size:10px;font-weight:700}
+    table{width:100%;border-collapse:collapse;margin-top:4px}
+    th{background:#f1f5f9;color:#475569;padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #e2e8f0}
+    td{padding:7px 8px;border-bottom:1px solid #f1f5f9}
+    tr.sum td{background:#f8fafc;border-top:1px solid #e2e8f0}
+    .c{text-align:center}.r{text-align:right}
+    .num{font-variant-numeric:tabular-nums;font-weight:600}
+    .no-ms{font-size:11px;color:#94a3b8;padding:8px 0}
+    .ftr{margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+    .actions{position:sticky;bottom:0;background:rgba(255,255,255,0.95);padding:12px 0;margin-top:16px;border-top:1px solid #e2e8f0;text-align:center}
+    .btn{background:#4f46e5;color:#fff;border:none;padding:11px 28px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,0.25)}
+    @media print{
+      body{background:#fff}
+      .page{padding:10px;max-width:none}
+      .actions,.btn{display:none !important}
+      .contractor{page-break-inside:avoid}
+    }
   </style></head><body>
-    <h1>${coName}</h1>
-    <div class="meta">${coAddr}<br>Subcontractors & Payment History · Generated ${now}</div>
-    <div class="meta"><b>Contractors:</b> ${Object.keys(groups).length} · <b>Work contracts:</b> ${(subs||[]).length}</div>
-    ${body || '<p>No subcontractors.</p>'}
-    <button onclick="window.print()" style="margin-top:16px;background:#6366f1;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;cursor:pointer">Print / Save PDF</button>
+  <div class="page">
+    <div class="hdr">
+      <div class="hdr-left">
+        ${logo ? `<img class="logo" src="${logo}" alt="logo"/>` : ""}
+        <div>
+          <div class="co-name">${coName}</div>
+          ${coNameAr ? `<div class="co-ar">${coNameAr}</div>` : ""}
+          <div class="co-meta">${coAddr}${coVat ? " · VAT " + coVat : ""}</div>
+        </div>
+      </div>
+      <div class="doc-box">
+        <div class="doc-title">Subcontractors Report</div>
+        <div class="doc-sub">Contracts & payment history</div>
+        <div class="doc-sub">${dateStr} · ${timeStr}</div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-l">Contractors</div><div class="kpi-v" style="color:#4f46e5">${names.length}</div></div>
+      <div class="kpi"><div class="kpi-l">Work contracts</div><div class="kpi-v" style="color:#0f172a">${(subs||[]).length}</div></div>
+      <div class="kpi"><div class="kpi-l">Total contract</div><div class="kpi-v" style="color:#6366f1">OMR ${grandContract.toFixed(3)}</div></div>
+      <div class="kpi"><div class="kpi-l">Total paid</div><div class="kpi-v" style="color:#059669">OMR ${grandPaid.toFixed(3)}</div></div>
+    </div>
+    ${body || "<p style='color:#94a3b8'>No subcontractors.</p>"}
+    <div class="ftr">
+      <span>Minarva Biz ERP · Confidential</span>
+      <span>${coName}</span>
+    </div>
+    <div class="actions"><button class="btn" onclick="window.print()">Print / Save as PDF</button></div>
+  </div>
   </body></html>`);
   w.document.close();
 }
@@ -147,6 +240,7 @@ function printSubcontractorsReport(subs, milestonesBySub = {}, company = {}) {
 function printOneSubcontractor(work, milestones, company = {}) {
   printSubcontractorsReport([work], { [work.id]: milestones || [] }, company);
 }
+
 
 export default function Subcontractors() {
   const { isAdmin: realIsAdmin, canEdit, setShowLogin, confirmAction, logActivity } = useAdmin();

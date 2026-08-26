@@ -44,61 +44,152 @@ function buildNotes(base, rentDue, rentAmt) {
 
 
 function printEquipmentReport(equip, company = {}) {
-  const isRent = (eq) => {
-    if (!eq) return false;
-    if (eq.status === "On Hire") return true;
-    const n = String(eq.notes || "");
+  const isRent = (e) => {
+    if (!e) return false;
+    if (e.status === "On Hire") return true;
+    const n = String(e.notes || "");
     return /\[RENT_DUE:/.test(n) || /\[RENT_AMT:/.test(n) || /rented from/i.test(n);
   };
   const coName = company.company_name || "TRATEEL AL NAJAH FOR TRADING";
+  const coNameAr = company.company_name_ar || "";
   const coAddr = company.company_address || "Sultanate of Oman";
-  const now = new Date().toLocaleString();
+  const coVat = company.company_vat_no || company.company_tax_no || "";
+  const coCr = company.company_cr || "";
+  const logo = company.company_logo || "";
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   const own = equip.filter(e => !isRent(e));
   const rent = equip.filter(e => isRent(e));
-  const row = (e) => {
-    const rentTag = isRent(e) ? "RENT" : "OWN";
-    const notes = String(e.notes || "").replace(/\[RENT_DUE:[^\]]*\]/g, "").replace(/\[RENT_AMT:[^\]]*\]/g, "").replace(/\[RETURNED:[^\]]*\]/g, "").trim();
-    return `<tr>
-      <td>${e.name || ""}</td>
-      <td>${e.type || ""}</td>
-      <td style="text-align:center;font-weight:700;color:${rentTag==="RENT"?"#c2410c":"#047857"}">${rentTag}</td>
-      <td style="text-align:center">${e.quantity ?? 1}</td>
-      <td>${e.status || ""}</td>
-      <td>${e.current_site || "—"}</td>
-      <td>${e.operator || "—"}</td>
-      <td style="font-size:10px;color:#64748b">${notes.slice(0, 90)}</td>
-    </tr>`;
+  const cleanNotes = (n) => String(n || "")
+    .replace(/\[RENT_DUE:[^\]]*\]/g, "")
+    .replace(/\[RENT_AMT:[^\]]*\]/g, "")
+    .replace(/\[RETURNED:[^\]]*\]/g, "")
+    .trim();
+
+  const section = (list, title, accent) => {
+    const rows = list.map((e, i) => {
+      const tag = isRent(e) ? "RENT" : "OWN";
+      const tagBg = isRent(e) ? "#fff7ed" : "#ecfdf5";
+      const tagFg = isRent(e) ? "#c2410c" : "#047857";
+      return `<tr>
+        <td class="c">${i + 1}</td>
+        <td><div class="name">${e.name || "—"}</div><div class="sub">${e.type || ""}</div></td>
+        <td class="c"><span class="badge" style="background:${tagBg};color:${tagFg}">${tag}</span></td>
+        <td class="c num">${e.quantity ?? 1}</td>
+        <td class="c">${e.status || "—"}</td>
+        <td>${e.current_site || "—"}</td>
+        <td>${e.operator || "—"}</td>
+        <td class="notes">${cleanNotes(e.notes).slice(0, 100)}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="8" class="empty">No items in this group</td></tr>`;
+    return `
+      <div class="section">
+        <div class="section-hd" style="border-left:4px solid ${accent}">
+          <span>${title}</span>
+          <span class="count">${list.length} item${list.length === 1 ? "" : "s"}</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px">#</th>
+              <th>Name / Type</th>
+              <th style="width:64px">Own/Rent</th>
+              <th style="width:48px">Qty</th>
+              <th style="width:88px">Status</th>
+              <th style="width:90px">Site</th>
+              <th style="width:100px">Supplier</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
   };
-  const table = (list, title) => `
-    <h2 style="font-size:14px;margin:18px 0 8px;color:#0f172a">${title} (${list.length})</h2>
-    <table>
-      <thead><tr>
-        <th>Name</th><th>Type</th><th>Own/Rent</th><th>Qty</th><th>Status</th><th>Site</th><th>Supplier/Op</th><th>Notes</th>
-      </tr></thead>
-      <tbody>${list.map(row).join("") || '<tr><td colspan="8" style="text-align:center;color:#94a3b8">None</td></tr>'}</tbody>
-    </table>`;
+
   const w = window.open("", "_blank");
   if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><title>Equipment Report</title>
+  w.document.write(`<!DOCTYPE html><html><head>
+  <meta charset="utf-8"/>
+  <title>Equipment Register — ${coName}</title>
   <style>
-    body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;font-size:12px}
-    h1{font-size:18px;margin:0 0 4px}
-    .meta{color:#64748b;font-size:11px;margin-bottom:12px}
-    table{width:100%;border-collapse:collapse}
-    th{background:#0f172a;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
-    td{padding:7px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}
-    tr:nth-child(even){background:#f8fafc}
-    @media print{button{display:none} body{padding:12px}}
+    *{box-sizing:border-box}
+    body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;margin:0;padding:0;color:#0f172a;background:#f1f5f9;font-size:12px;line-height:1.45}
+    .page{max-width:1000px;margin:0 auto;background:#fff;padding:28px 32px 40px;min-height:100vh}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #0f172a;padding-bottom:16px;margin-bottom:18px}
+    .hdr-left{display:flex;gap:14px;align-items:center}
+    .logo{height:52px;width:auto;object-fit:contain}
+    .co-name{font-size:18px;font-weight:800;letter-spacing:-0.02em;margin:0}
+    .co-ar{font-size:13px;color:#475569;margin-top:2px}
+    .co-meta{font-size:11px;color:#64748b;margin-top:4px}
+    .doc-box{text-align:right}
+    .doc-title{font-size:15px;font-weight:800;color:#4f46e5;text-transform:uppercase;letter-spacing:0.04em}
+    .doc-sub{font-size:11px;color:#64748b;margin-top:4px}
+    .kpis{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+    .kpi{flex:1;min-width:120px;background:linear-gradient(180deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px}
+    .kpi-l{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em}
+    .kpi-v{font-size:22px;font-weight:800;margin-top:2px}
+    .section{margin-bottom:22px}
+    .section-hd{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8fafc;border-radius:8px 8px 0 0;font-weight:800;font-size:13px;margin-bottom:0}
+    .count{font-size:11px;font-weight:600;color:#64748b}
+    table{width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-top:none}
+    th{background:#0f172a;color:#fff;padding:9px 10px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em}
+    td{padding:9px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+    tr:nth-child(even) td{background:#fafbfc}
+    tr:hover td{background:#f1f5f9}
+    .c{text-align:center}
+    .num{font-weight:700;font-variant-numeric:tabular-nums}
+    .name{font-weight:700;color:#0f172a}
+    .sub{font-size:10px;color:#94a3b8;margin-top:1px}
+    .notes{font-size:10px;color:#64748b;max-width:220px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800}
+    .empty{text-align:center;color:#94a3b8;padding:20px !important}
+    .ftr{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+    .actions{position:sticky;bottom:0;background:rgba(255,255,255,0.95);padding:12px 0;margin-top:16px;border-top:1px solid #e2e8f0;text-align:center}
+    .btn{background:#4f46e5;color:#fff;border:none;padding:11px 28px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,0.25)}
+    .btn:hover{background:#4338ca}
+    @media print{
+      body{background:#fff}
+      .page{padding:12px;max-width:none}
+      .actions,.btn{display:none !important}
+      tr:hover td{background:transparent}
+      .section{page-break-inside:avoid}
+    }
   </style></head><body>
-    <h1>${coName}</h1>
-    <div class="meta">${coAddr}<br>Equipment & Tools Register · Generated ${now}</div>
-    <div class="meta"><b>Total:</b> ${equip.length} · <b>Own:</b> ${own.length} · <b>Rented:</b> ${rent.length}</div>
-    ${table(own, "Owned equipment / tools / PPE")}
-    ${table(rent, "Rented equipment")}
-    <button onclick="window.print()" style="margin-top:16px;background:#6366f1;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;cursor:pointer">Print / Save PDF</button>
+  <div class="page">
+    <div class="hdr">
+      <div class="hdr-left">
+        ${logo ? `<img class="logo" src="${logo}" alt="logo"/>` : ""}
+        <div>
+          <div class="co-name">${coName}</div>
+          ${coNameAr ? `<div class="co-ar">${coNameAr}</div>` : ""}
+          <div class="co-meta">${coAddr}${coVat ? " · VAT " + coVat : ""}${coCr ? " · CR " + coCr : ""}</div>
+        </div>
+      </div>
+      <div class="doc-box">
+        <div class="doc-title">Equipment Register</div>
+        <div class="doc-sub">Tools · PPE · Rentals</div>
+        <div class="doc-sub">${dateStr} · ${timeStr}</div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-l">Total items</div><div class="kpi-v" style="color:#4f46e5">${equip.length}</div></div>
+      <div class="kpi"><div class="kpi-l">Owned</div><div class="kpi-v" style="color:#059669">${own.length}</div></div>
+      <div class="kpi"><div class="kpi-l">Rented</div><div class="kpi-v" style="color:#d97706">${rent.length}</div></div>
+      <div class="kpi"><div class="kpi-l">Total qty (own+rent)</div><div class="kpi-v" style="color:#0f172a">${equip.reduce((s,e)=>s+parseFloat(e.quantity||1),0)}</div></div>
+    </div>
+    ${section(own, "Owned equipment, tools & PPE", "#059669")}
+    ${section(rent, "Rented equipment", "#d97706")}
+    <div class="ftr">
+      <span>Minarva Biz ERP · Confidential</span>
+      <span>${coName}</span>
+    </div>
+    <div class="actions"><button class="btn" onclick="window.print()">Print / Save as PDF</button></div>
+  </div>
   </body></html>`);
   w.document.close();
 }
+
 
 export default function Equipment(){
   const{isAdmin:r,canEdit,confirmAction,logActivity}=useAdmin();const isAdmin=canEdit("equipment");
