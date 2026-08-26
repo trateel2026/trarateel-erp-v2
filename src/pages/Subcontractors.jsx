@@ -159,11 +159,11 @@ function printSubcontractorsReport(subs, milestonesBySub = {}, company = {}) {
   <title>Subcontractors Report — ${coName}</title>
   <style>
     *{box-sizing:border-box}
-    body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;margin:0;padding:0;color:#0f172a;background:#f1f5f9;font-size:12px;line-height:1.45}
-    .page{max-width:980px;margin:0 auto;background:#fff;padding:28px 32px 40px}
+    body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;margin:0;padding:0;color:#0f172a;background:#f1f5f9;font-size:11px;line-height:1.4}
+    .page{max-width:190mm;margin:0 auto;background:#fff;padding:10mm 8mm 12mm}
     .hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:3px solid #0f172a;padding-bottom:16px;margin-bottom:18px}
     .hdr-left{display:flex;gap:14px;align-items:center}
-    .logo{height:52px;object-fit:contain}
+    .logo{height:40px;object-fit:contain}
     .co-name{font-size:18px;font-weight:800;margin:0}
     .co-ar{font-size:13px;color:#475569;margin-top:2px}
     .co-meta{font-size:11px;color:#64748b;margin-top:4px}
@@ -173,7 +173,7 @@ function printSubcontractorsReport(subs, milestonesBySub = {}, company = {}) {
     .kpis{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
     .kpi{flex:1;min-width:130px;background:linear-gradient(180deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px}
     .kpi-l{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase}
-    .kpi-v{font-size:20px;font-weight:800;margin-top:2px}
+    .kpi-v{font-size:16px;font-weight:800;margin-top:2px}
     .contractor{margin-bottom:24px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;page-break-inside:avoid}
     .c-hd{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;flex-wrap:wrap}
     .c-name{font-size:15px;font-weight:800}
@@ -197,11 +197,19 @@ function printSubcontractorsReport(subs, milestonesBySub = {}, company = {}) {
     .ftr{margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
     .actions{position:sticky;bottom:0;background:rgba(255,255,255,0.95);padding:12px 0;margin-top:16px;border-top:1px solid #e2e8f0;text-align:center}
     .btn{background:#4f46e5;color:#fff;border:none;padding:11px 28px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,0.25)}
+    @page{size:A4 portrait;margin:10mm 8mm}
     @media print{
-      body{background:#fff}
-      .page{padding:10px;max-width:none}
+      body{background:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10px}
+      .page{padding:0;max-width:none;width:100%;margin:0}
       .actions,.btn{display:none !important}
-      .contractor{page-break-inside:avoid}
+      tr:hover td{background:transparent}
+      .section,.contractor,.work{page-break-inside:avoid}
+      thead{display:table-header-group}
+      .kpis{gap:6px}
+      .kpi-v{font-size:14px !important}
+      .logo{height:36px !important}
+      table{font-size:9px}
+      th,td{padding:4px 5px !important}
     }
   </style></head><body>
   <div class="page">
