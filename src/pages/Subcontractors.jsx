@@ -75,12 +75,87 @@ function MilestoneGraph({ milestones, type, title }) {
 
 const Field = ({label,children}) => <div><div style={{fontSize:12,color:"#64748b",marginBottom:4,fontWeight:500}}>{label}</div>{children}</div>;
 
+
+function printSubcontractorsReport(subs, milestonesBySub = {}, company = {}) {
+  const coName = company.company_name || "TRATEEL AL NAJAH FOR TRADING";
+  const coAddr = company.company_address || "Sultanate of Oman";
+  const now = new Date().toLocaleString();
+  const groups = {};
+  (subs || []).forEach(s => {
+    const k = s.name || "Unknown";
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(s);
+  });
+  let body = "";
+  Object.keys(groups).sort().forEach(name => {
+    const works = groups[name];
+    const totalContract = works.reduce((t, w) => t + parseFloat(w.contract_amount || 0), 0);
+    const totalPaid = works.reduce((t, w) => t + parseFloat(w.paid || 0), 0);
+    body += `<div class="block">
+      <h2>${name}</h2>
+      <div class="meta">Works: ${works.length} · Contract: OMR ${totalContract.toFixed(3)} · Paid: OMR ${totalPaid.toFixed(3)}</div>`;
+    works.forEach(w => {
+      body += `<div class="work">
+        <div><b>Project:</b> ${w.project || "—"} · <b>Specialty:</b> ${w.specialty || "—"} · <b>Status:</b> ${w.status || "—"}</div>
+        <div><b>Contract:</b> OMR ${parseFloat(w.contract_amount || 0).toFixed(3)} · <b>Paid:</b> OMR ${parseFloat(w.paid || 0).toFixed(3)} · <b>Phone:</b> ${w.phone || "—"}</div>`;
+      const ms = milestonesBySub[w.id] || [];
+      if (ms.length) {
+        body += `<table><thead><tr><th>#</th><th>Schedule / Milestone</th><th>Amount</th><th>Paid</th><th>Date</th><th>Status</th></tr></thead><tbody>`;
+        ms.forEach((m, i) => {
+          body += `<tr>
+            <td>${i + 1}</td>
+            <td>${m.label || m.title || "Milestone"}</td>
+            <td style="text-align:right">${parseFloat(m.amount || 0).toFixed(3)}</td>
+            <td style="text-align:right">${parseFloat(m.paid_amount || m.amount || 0).toFixed(3)}</td>
+            <td>${m.payment_date || "—"}</td>
+            <td>${m.status || "—"}</td>
+          </tr>`;
+        });
+        body += `</tbody></table>`;
+      } else {
+        body += `<div class="meta">No payment schedule recorded.</div>`;
+      }
+      body += `</div>`;
+    });
+    body += `</div>`;
+  });
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><title>Subcontractors Report</title>
+  <style>
+    body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;font-size:12px}
+    h1{font-size:18px;margin:0 0 4px}
+    h2{font-size:15px;margin:0 0 6px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:4px}
+    .meta{color:#64748b;font-size:11px;margin-bottom:8px}
+    .block{margin-bottom:22px;page-break-inside:avoid}
+    .work{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin:8px 0}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th{background:#0f172a;color:#fff;padding:6px 8px;text-align:left;font-size:10px}
+    td{padding:6px 8px;border-bottom:1px solid #e2e8f0}
+    tr:nth-child(even){background:#fff}
+    @media print{button{display:none} body{padding:10px}}
+  </style></head><body>
+    <h1>${coName}</h1>
+    <div class="meta">${coAddr}<br>Subcontractors & Payment History · Generated ${now}</div>
+    <div class="meta"><b>Contractors:</b> ${Object.keys(groups).length} · <b>Work contracts:</b> ${(subs||[]).length}</div>
+    ${body || '<p>No subcontractors.</p>'}
+    <button onclick="window.print()" style="margin-top:16px;background:#6366f1;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;cursor:pointer">Print / Save PDF</button>
+  </body></html>`);
+  w.document.close();
+}
+
+function printOneSubcontractor(work, milestones, company = {}) {
+  printSubcontractorsReport([work], { [work.id]: milestones || [] }, company);
+}
+
 export default function Subcontractors() {
   const { isAdmin: realIsAdmin, canEdit, setShowLogin, confirmAction, logActivity } = useAdmin();
   const isAdmin = canEdit("subcontractors");
   const [subs, setSubs] = useState([]);
   const [projects, setProjects] = useState([]);
   const [milestones, setMilestones] = useState([]);
+  const [company, setCompany] = useState({});
+  const [allMilestones, setAllMilestones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedContractor, setSelectedContractor] = useState(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState(null);
@@ -119,6 +194,17 @@ export default function Subcontractors() {
       supabase.from("projects").select("id,name,customer").order("name"),
     ]);
     setSubs((s.data||[]).filter(x => x.name && String(x.name).trim())); setProjects(p.data||[]); setLoading(false);
+  
+    try {
+      const [{ data: st }, { data: allMs }] = await Promise.all([
+        supabase.from("app_settings").select("key,value"),
+        supabase.from("sub_milestones").select("*").order("sort_order"),
+      ]);
+      const map = {};
+      (st || []).forEach(r => { if (r.key) map[r.key] = r.value; });
+      setCompany(map);
+      setAllMilestones(allMs || []);
+    } catch {}
   };
 
   const loadMilestones = async (subId) => {
@@ -337,10 +423,20 @@ export default function Subcontractors() {
           <div style={{ fontSize:22, fontWeight:800, color:"#0f172a", marginBottom:4 }}>Subcontractors</div>
           <div style={{ fontSize:13, color:"#64748b" }}>{contractors.length} contractors · {subs.length} work contracts</div>
         </div>
-        {isAdmin
-          ? <button onClick={()=>setShowForm(!showForm)} style={{ background:"#6366f1",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add Work Contract</button>
-          : <button onClick={()=>setShowLogin(true)} style={{ background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer" }}>🔑 Login to Add</button>
-        }
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+          <button onClick={() => {
+            const map = {};
+            (allMilestones || []).forEach(m => {
+              if (!map[m.subcontractor_id]) map[m.subcontractor_id] = [];
+              map[m.subcontractor_id].push(m);
+            });
+            printSubcontractorsReport(subs, map, company);
+          }} style={{ background:"#0f172a", color:"#fff", border:"none", borderRadius:8, padding:"10px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>🖨 Print / PDF</button>
+          {isAdmin
+            ? <button onClick={()=>setShowForm(!showForm)} style={{ background:"#6366f1",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add Work Contract</button>
+            : <button onClick={()=>setShowLogin(true)} style={{ background:"#f1f5f9",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600,cursor:"pointer" }}>🔑 Login to Add</button>
+          }
+        </div>
       </div>
 
       {/* Breadcrumb */}
@@ -609,7 +705,10 @@ export default function Subcontractors() {
             )}
 
             {/* MILESTONE TABLE — Excel style */}
-            <div style={{ fontSize:12,fontWeight:700,color:"#64748b",letterSpacing:0.5,marginBottom:12 }}>PAYMENT SCHEDULE</div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:8 }}>
+              <div style={{ fontSize:12,fontWeight:700,color:"#64748b",letterSpacing:0.5 }}>PAYMENT SCHEDULE</div>
+              <button onClick={() => printOneSubcontractor(selectedWork, milestones, company)} style={{ background:"#0f172a", color:"#fff", border:"none", borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>🖨 Print this contract</button>
+            </div>
             {milestones.length===0
               ?<div style={{ textAlign:"center",color:"#94a3b8",fontSize:13,padding:30 }}>No milestones yet. {isAdmin?"Click \"+ Milestone\" to add.":""}</div>
               :<div style={{ overflowX:"auto",borderRadius:10,border:"1px solid #e2e8f0" }}>

@@ -42,9 +42,67 @@ function buildNotes(base, rentDue, rentAmt) {
   return n;
 }
 
+
+function printEquipmentReport(equip, company = {}) {
+  const isRent = (eq) => {
+    if (!eq) return false;
+    if (eq.status === "On Hire") return true;
+    const n = String(eq.notes || "");
+    return /\[RENT_DUE:/.test(n) || /\[RENT_AMT:/.test(n) || /rented from/i.test(n);
+  };
+  const coName = company.company_name || "TRATEEL AL NAJAH FOR TRADING";
+  const coAddr = company.company_address || "Sultanate of Oman";
+  const now = new Date().toLocaleString();
+  const own = equip.filter(e => !isRent(e));
+  const rent = equip.filter(e => isRent(e));
+  const row = (e) => {
+    const rentTag = isRent(e) ? "RENT" : "OWN";
+    const notes = String(e.notes || "").replace(/\[RENT_DUE:[^\]]*\]/g, "").replace(/\[RENT_AMT:[^\]]*\]/g, "").replace(/\[RETURNED:[^\]]*\]/g, "").trim();
+    return `<tr>
+      <td>${e.name || ""}</td>
+      <td>${e.type || ""}</td>
+      <td style="text-align:center;font-weight:700;color:${rentTag==="RENT"?"#c2410c":"#047857"}">${rentTag}</td>
+      <td style="text-align:center">${e.quantity ?? 1}</td>
+      <td>${e.status || ""}</td>
+      <td>${e.current_site || "—"}</td>
+      <td>${e.operator || "—"}</td>
+      <td style="font-size:10px;color:#64748b">${notes.slice(0, 90)}</td>
+    </tr>`;
+  };
+  const table = (list, title) => `
+    <h2 style="font-size:14px;margin:18px 0 8px;color:#0f172a">${title} (${list.length})</h2>
+    <table>
+      <thead><tr>
+        <th>Name</th><th>Type</th><th>Own/Rent</th><th>Qty</th><th>Status</th><th>Site</th><th>Supplier/Op</th><th>Notes</th>
+      </tr></thead>
+      <tbody>${list.map(row).join("") || '<tr><td colspan="8" style="text-align:center;color:#94a3b8">None</td></tr>'}</tbody>
+    </table>`;
+  const w = window.open("", "_blank");
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><title>Equipment Report</title>
+  <style>
+    body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;font-size:12px}
+    h1{font-size:18px;margin:0 0 4px}
+    .meta{color:#64748b;font-size:11px;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#0f172a;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
+    td{padding:7px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+    tr:nth-child(even){background:#f8fafc}
+    @media print{button{display:none} body{padding:12px}}
+  </style></head><body>
+    <h1>${coName}</h1>
+    <div class="meta">${coAddr}<br>Equipment & Tools Register · Generated ${now}</div>
+    <div class="meta"><b>Total:</b> ${equip.length} · <b>Own:</b> ${own.length} · <b>Rented:</b> ${rent.length}</div>
+    ${table(own, "Owned equipment / tools / PPE")}
+    ${table(rent, "Rented equipment")}
+    <button onclick="window.print()" style="margin-top:16px;background:#6366f1;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;cursor:pointer">Print / Save PDF</button>
+  </body></html>`);
+  w.document.close();
+}
+
 export default function Equipment(){
   const{isAdmin:r,canEdit,confirmAction,logActivity}=useAdmin();const isAdmin=canEdit("equipment");
-  const[equip,setEquip]=useState([]);const[schedules,setSchedules]=useState([]);const[sites,setSites]=useState([]);
+  const[equip,setEquip]=useState([]);const[schedules,setSchedules]=useState([]);const[sites,setSites]=useState([]);const[company,setCompany]=useState({});
   const[loading,setLoading]=useState(true);const[tab,setTab]=useState("fleet");
   const[showForm,setShowForm]=useState(false);const[form,setForm]=useState(empty());const[editId,setEditId]=useState(null);
   const[filterStatus,setFilterStatus]=useState("All");const[filterOwn,setFilterOwn]=useState("All");const[saving,setSaving]=useState(false);const[msg,setMsg]=useState("");
@@ -55,7 +113,9 @@ export default function Equipment(){
     const[e,s,p]=await Promise.all([supabase.from("equipment").select("*").order("name"),supabase.from("equipment_schedule").select("*").order("start_date",{ascending:false}),supabase.from("projects").select("name,site").order("name")]);
     setEquip(e.data||[]);setSchedules(s.data||[]);
     const allSites=new Set();(p.data||[]).forEach(pr=>{if(pr.name)allSites.add(pr.name);if(pr.site)allSites.add(pr.site);});(e.data||[]).forEach(eq=>{if(eq.current_site)allSites.add(eq.current_site);});
-    setSites([...allSites].filter(Boolean).sort());setLoading(false);
+    setSites([...allSites].filter(Boolean).sort());
+    try{const{data:st}=await supabase.from("app_settings").select("key,value");const map={};(st||[]).forEach(r=>{if(r.key)map[r.key]=r.value;});setCompany(map);}catch{}
+    setLoading(false);
   };
   useEffect(()=>{load();},[]);
   const showMsg=(t)=>{setMsg(t);setTimeout(()=>setMsg(""),3000);};
@@ -185,7 +245,10 @@ export default function Equipment(){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
         <div><h2 style={{margin:0,fontSize:22,color:"#0f172a"}}>🚜 Equipment</h2><div style={{fontSize:13,color:"#64748b"}}>Track machinery and site assignments</div></div>
         {msg&&<span style={{fontSize:12,fontWeight:600,color:msg.startsWith("✅")?"#10b981":"#ef4444",padding:"6px 14px",borderRadius:20,background:msg.startsWith("✅")?"#ecfdf5":"#fef2f2"}}>{msg}</span>}
-        {isAdmin&&<button onClick={()=>{setForm(empty());setEditId(null);setShowForm(true);}} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:10,padding:"10px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Add Equipment</button>}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={()=>printEquipmentReport(equip, company)} style={{background:"#0f172a",color:"#fff",border:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:700,cursor:"pointer"}}>🖨 Print / PDF</button>
+          {isAdmin&&<button onClick={()=>{setForm(empty());setEditId(null);setShowForm(true);}} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:10,padding:"10px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Add Equipment</button>}
+        </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
         {[["Total",equip.length,"#6366f1"],["Own",ownCount,"#059669"],["Rented",rentCount,"#d97706"],["In Use",equip.filter(e=>e.status==="In Use"||e.status==="On Hire").length,"#8b5cf6"]].map(([l,v,c])=>(<div key={l} style={{background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #e2e8f0"}}><div style={{fontSize:11,color:"#64748b",fontWeight:600}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div></div>))}
