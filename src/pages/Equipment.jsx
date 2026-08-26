@@ -26,6 +26,15 @@ function daysUntil(dateStr) {
   const n = new Date(); n.setHours(0,0,0,0);
   return Math.round((t - n) / 86400000);
 }
+/** Rental if status On Hire, or notes have rent tags / "Rented from" */
+function isRental(eq) {
+  if (!eq) return false;
+  if (eq.status === "On Hire") return true;
+  const n = String(eq.notes || "");
+  if (/\[RENT_DUE:/.test(n) || /\[RENT_AMT:/.test(n)) return true;
+  if (/rented from/i.test(n)) return true;
+  return false;
+}
 function buildNotes(base, rentDue, rentAmt) {
   let n = String(base || "").replace(/\[RENT_DUE:[^\]]*\]/g, "").replace(/\[RENT_AMT:[^\]]*\]/g, "").trim();
   if (rentDue) n = `${n} [RENT_DUE:${rentDue}]`.trim();
@@ -38,7 +47,7 @@ export default function Equipment(){
   const[equip,setEquip]=useState([]);const[schedules,setSchedules]=useState([]);const[sites,setSites]=useState([]);
   const[loading,setLoading]=useState(true);const[tab,setTab]=useState("fleet");
   const[showForm,setShowForm]=useState(false);const[form,setForm]=useState(empty());const[editId,setEditId]=useState(null);
-  const[filterStatus,setFilterStatus]=useState("All");const[saving,setSaving]=useState(false);const[msg,setMsg]=useState("");
+  const[filterStatus,setFilterStatus]=useState("All");const[filterOwn,setFilterOwn]=useState("All");const[saving,setSaving]=useState(false);const[msg,setMsg]=useState("");
   const[showSched,setShowSched]=useState(null);const[schedSite,setSchedSite]=useState("");const[schedCustom,setSchedCustom]=useState("");
   const[showTransfer,setShowTransfer]=useState(null);const[transferSite,setTransferSite]=useState("");const[transferCustom,setTransferCustom]=useState("");
 
@@ -95,7 +104,14 @@ export default function Equipment(){
     logActivity("Transferred",`${eq?.name}: ${eq?.current_site} → ${site}`,"Equipment");
     showMsg("✅ Transferred!");setShowTransfer(null);setTransferSite("");setTransferCustom("");await load();setSaving(false);};
 
-  const filtered=equip.filter(e=>filterStatus==="All"||e.status===filterStatus);
+  const filtered=equip.filter(e=>{
+    if(filterStatus!=="All"&&e.status!==filterStatus) return false;
+    if(filterOwn==="Own"&&isRental(e)) return false;
+    if(filterOwn==="Rented"&&!isRental(e)) return false;
+    return true;
+  });
+  const ownCount=equip.filter(e=>!isRental(e)).length;
+  const rentCount=equip.filter(e=>isRental(e)).length;
   const stColor=(s)=>s==="Available"?"#10b981":s==="In Use"?"#6366f1":s==="Maintenance"?"#f59e0b":"#94a3b8";
   if(loading)return<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>Loading...</div>;
 
@@ -119,7 +135,7 @@ export default function Equipment(){
         {isAdmin&&<button onClick={()=>{setForm(empty());setEditId(null);setShowForm(true);}} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:10,padding:"10px 20px",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Add Equipment</button>}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
-        {[["Total",equip.length,"#6366f1"],["In Use",equip.filter(e=>e.status==="In Use").length,"#8b5cf6"],["Available",equip.filter(e=>e.status==="Available").length,"#10b981"],["Maintenance",equip.filter(e=>e.status==="Maintenance").length,"#f59e0b"]].map(([l,v,c])=>(<div key={l} style={{background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #e2e8f0"}}><div style={{fontSize:11,color:"#64748b",fontWeight:600}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div></div>))}
+        {[["Total",equip.length,"#6366f1"],["Own",ownCount,"#059669"],["Rented",rentCount,"#d97706"],["In Use",equip.filter(e=>e.status==="In Use"||e.status==="On Hire").length,"#8b5cf6"]].map(([l,v,c])=>(<div key={l} style={{background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #e2e8f0"}}><div style={{fontSize:11,color:"#64748b",fontWeight:600}}>{l}</div><div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div></div>))}
       </div>
       <div style={{display:"flex",gap:4,marginBottom:16}}>{[["fleet","🚜 Fleet"],["schedule","📅 History"]].map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"10px 20px",borderRadius:"10px 10px 0 0",border:"none",cursor:"pointer",fontSize:13,fontWeight:700,background:tab===id?"#6366f1":"#f1f5f9",color:tab===id?"#fff":"#64748b"}}>{label}</button>))}</div>
 
@@ -140,15 +156,32 @@ export default function Equipment(){
         </div>
       )}
       {tab==="fleet"&&(<div>
-        <div style={{display:"flex",gap:6,marginBottom:14}}>{["All",...STATUSES].map(s=>(<button key={s} onClick={()=>setFilterStatus(s)} style={{padding:"6px 14px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:filterStatus===s?"#6366f1":"#f1f5f9",color:filterStatus===s?"#fff":"#64748b"}}>{s}</button>))}</div>
+        <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+          {[["All","All"],["Own","🟢 Own"],["Rented","🟠 Rented"]].map(([id,label])=>(
+            <button key={id} onClick={()=>setFilterOwn(id)} style={{padding:"6px 14px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:filterOwn===id?(id==="Rented"?"#d97706":id==="Own"?"#059669":"#6366f1"):"#f1f5f9",color:filterOwn===id?"#fff":"#64748b"}}>{label}</button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>{["All",...STATUSES].map(s=>(<button key={s} onClick={()=>setFilterStatus(s)} style={{padding:"6px 14px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:filterStatus===s?"#6366f1":"#f1f5f9",color:filterStatus===s?"#fff":"#64748b"}}>{s}</button>))}</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
           {filtered.map(eq=>{const sc=stColor(eq.status);return(
             <div key={eq.id} style={{background:"#fff",borderRadius:12,padding:18,border:"1px solid #e2e8f0"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{eq.name}</div><span style={{background:`${sc}20`,color:sc,borderRadius:10,padding:"2px 10px",fontSize:11,fontWeight:600}}>{eq.status}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8,flexWrap:"wrap"}}>
+                <div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{eq.name}</div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <span style={{background:isRental(eq)?"#fff7ed":"#ecfdf5",color:isRental(eq)?"#c2410c":"#047857",border:`1px solid ${isRental(eq)?"#fed7aa":"#a7f3d0"}`,borderRadius:10,padding:"2px 10px",fontSize:11,fontWeight:800}}>{isRental(eq)?"🟠 RENT":"🟢 OWN"}</span>
+                  <span style={{background:`${sc}20`,color:sc,borderRadius:10,padding:"2px 10px",fontSize:11,fontWeight:600}}>{eq.status}</span>
+                </div>
+              </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:12,color:"#64748b",marginBottom:12}}>
                 <div>Qty: <strong style={{color:"#6366f1"}}>{eq.quantity||1}</strong> · 📍 <strong style={{color:"#1e293b"}}>{eq.current_site||"—"}</strong></div>
-                <div>💰 <strong style={{color:"#10b981"}}>OMR {parseFloat(eq.daily_rate||0).toFixed(3)}/day</strong></div>
+                <div>{isRental(eq)
+                  ? <span>🏷 Supplier: <strong style={{color:"#c2410c"}}>{eq.operator||"—"}</strong></span>
+                  : <span>💰 <strong style={{color:"#10b981"}}>OMR {parseFloat(eq.daily_rate||0).toFixed(3)}/day</strong></span>}
+                </div>
               </div>
+              {isRental(eq) && parseRentMeta(eq.notes||"").due && (
+                <div style={{fontSize:11,color:"#b45309",marginBottom:10,fontWeight:600}}>Next rent due: {parseRentMeta(eq.notes||"").due}{parseRentMeta(eq.notes||"").amt!=null?` · OMR ${parseRentMeta(eq.notes||"").amt}`:""}</div>
+              )}
               {isAdmin&&(<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {eq.status==="Available"&&<button onClick={()=>{setShowSched(eq.id);setSchedSite("");setSchedCustom("");}} style={{flex:1,background:"#eef2ff",color:"#6366f1",border:"1px solid #c7d2fe",borderRadius:8,padding:"7px",fontSize:12,fontWeight:700,cursor:"pointer"}}>📌 Assign</button>}
                 {eq.status==="In Use"&&<>
@@ -182,7 +215,9 @@ export default function Equipment(){
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
           <div><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Quantity</div><input type="number" value={form.quantity} onChange={e=>setForm(p=>({...p,quantity:e.target.value}))} min="1" style={inp}/></div>
-          <div><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Status</div><select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))} style={inp}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
+          <div><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Status</div><select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))} style={inp}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>Use <b>On Hire</b> for rented items. Own items → Available / In Use.</div>
+          </div>
           <div><div style={{fontSize:11,color:"#64748b",fontWeight:600,marginBottom:4}}>Rate/Day (OMR)</div><input type="number" value={form.daily_rate} onChange={e=>setForm(p=>({...p,daily_rate:e.target.value}))} step="0.001" style={inp}/></div>
         </div>
         <div style={{marginBottom:12}}>
