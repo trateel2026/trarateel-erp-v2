@@ -44,6 +44,21 @@ function buildNotes(base, rentDue, rentAmt) {
 
 
 
+
+function parseStockMeta(notes="") {
+  const n = String(notes || "");
+  const stock = (n.match(/STOCK:(\d+(?:\.\d+)?)/i) || [])[1];
+  const issued = (n.match(/ISSUED:(\d+(?:\.\d+)?)/i) || [])[1];
+  const written = (n.match(/WRITTEN_OFF:(\d+(?:\.\d+)?)/i) || [])[1];
+  const purchased = (n.match(/Purchased\s+(\d+(?:\.\d+)?)/i) || [])[1];
+  return {
+    stock: stock != null ? parseFloat(stock) : null,
+    issued: issued != null ? parseFloat(issued) : null,
+    written: written != null ? parseFloat(written) : null,
+    purchased: purchased != null ? parseFloat(purchased) : null,
+  };
+}
+
 const CATEGORY_ORDER = [
   "Power Tool",
   "Hand Tools",
@@ -97,27 +112,33 @@ function printEquipmentReport(equip, company = {}) {
     let lastType = null;
     let i = 0;
     if (!list.length) {
-      rows = `<tr><td colspan="8" class="empty">No items in this group</td></tr>`;
+      rows = `<tr><td colspan="10" class="empty">No items in this group</td></tr>`;
     } else {
       list.forEach((e) => {
         const t = (e.type || "Other").trim() || "Other";
         if (t !== lastType) {
-          rows += `<tr><td colspan="8" style="background:#f1f5f9;font-weight:800;font-size:10px;color:#334155;padding:6px 8px;text-transform:uppercase;letter-spacing:0.03em">${t}</td></tr>`;
+          rows += `<tr><td colspan="10" style="background:#f1f5f9;font-weight:800;font-size:10px;color:#334155;padding:6px 8px;text-transform:uppercase;letter-spacing:0.03em">${t}</td></tr>`;
           lastType = t;
         }
         i += 1;
         const tag = isRent(e) ? "RENT" : "OWN";
         const tagBg = isRent(e) ? "#fff7ed" : "#ecfdf5";
         const tagFg = isRent(e) ? "#c2410c" : "#047857";
+        const sm = parseStockMeta(e.notes || "");
+        const wOff = sm.written != null && sm.written > 0 ? `<span style="color:#dc2626;font-weight:700">${sm.written}</span>` : "—";
+        const stockC = sm.stock != null ? sm.stock : "—";
+        const issC = sm.issued != null ? sm.issued : "—";
         rows += `<tr>
         <td class="c">${i}</td>
         <td><div class="name">${e.name || "—"}</div><div class="sub">${e.type || ""}</div></td>
         <td class="c"><span class="badge" style="background:${tagBg};color:${tagFg}">${tag}</span></td>
-        <td class="c num">${e.quantity ?? 1}</td>
+        <td class="c num">${e.quantity ?? 0}</td>
+        <td class="c num">${stockC}</td>
+        <td class="c num">${issC}</td>
+        <td class="c num">${wOff}</td>
         <td class="c">${e.status || "—"}</td>
         <td>${e.current_site || "—"}</td>
-        <td>${e.operator || "—"}</td>
-        <td class="notes">${cleanNotes(e.notes).slice(0, 100)}</td>
+        <td class="notes">${cleanNotes(e.notes).slice(0, 80)}</td>
       </tr>`;
       });
     }
@@ -130,13 +151,15 @@ function printEquipmentReport(equip, company = {}) {
         <table>
           <thead>
             <tr>
-              <th style="width:36px">#</th>
+              <th style="width:28px">#</th>
               <th>Name / Type</th>
-              <th style="width:64px">Own/Rent</th>
-              <th style="width:48px">Qty</th>
-              <th style="width:88px">Status</th>
-              <th style="width:90px">Site</th>
-              <th style="width:100px">Supplier</th>
+              <th style="width:52px">Own/Rent</th>
+              <th style="width:40px">Qty</th>
+              <th style="width:40px">Stock</th>
+              <th style="width:42px">Issued</th>
+              <th style="width:48px">W/Off</th>
+              <th style="width:72px">Status</th>
+              <th style="width:70px">Site</th>
               <th>Notes</th>
             </tr>
           </thead>
@@ -225,6 +248,36 @@ function printEquipmentReport(equip, company = {}) {
     </div>
     ${section(own, "Owned equipment, tools & PPE", "#059669")}
     ${section(rent, "Rented equipment", "#d97706")}
+    ${(() => {
+      const wo = equip.filter(e => {
+        const sm = parseStockMeta(e.notes || "");
+        return sm.written != null && sm.written > 0;
+      });
+      if (!wo.length) return "";
+      const lines = wo.map(e => {
+        const sm = parseStockMeta(e.notes || "");
+        return `<tr>
+          <td>${e.name || ""}</td>
+          <td class="c">${sm.purchased != null ? sm.purchased : "—"}</td>
+          <td class="c">${sm.stock != null ? sm.stock : "—"}</td>
+          <td class="c">${sm.issued != null ? sm.issued : "—"}</td>
+          <td class="c" style="color:#dc2626;font-weight:800">${sm.written}</td>
+          <td class="c">${e.status || ""}</td>
+        </tr>`;
+      }).join("");
+      return `<div class="section">
+        <div class="section-hd" style="border-left:4px solid #dc2626">
+          <span>Written-off / consumed items</span>
+          <span class="count">${wo.length} item(s)</span>
+        </div>
+        <table>
+          <thead><tr>
+            <th>Item</th><th>Purchased</th><th>Stock</th><th>Issued</th><th>Written-off</th><th>Status</th>
+          </tr></thead>
+          <tbody>${lines}</tbody>
+        </table>
+      </div>`;
+    })()}
     <div class="ftr">
       <span>Minarva Biz ERP · Confidential</span>
       <span>${coName}</span>
@@ -443,12 +496,22 @@ export default function Equipment(){
                 </div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:12,color:"#64748b",marginBottom:12}}>
-                <div>Qty: <strong style={{color:"#6366f1"}}>{eq.quantity||1}</strong> · 📍 <strong style={{color:"#1e293b"}}>{eq.current_site||"—"}</strong></div>
+                <div>Qty: <strong style={{color:"#6366f1"}}>{eq.quantity||0}</strong> · 📍 <strong style={{color:"#1e293b"}}>{eq.current_site||"—"}</strong></div>
                 <div>{isRental(eq)
                   ? <span>🏷 Supplier: <strong style={{color:"#c2410c"}}>{eq.operator||"—"}</strong></span>
                   : <span>💰 <strong style={{color:"#10b981"}}>OMR {parseFloat(eq.daily_rate||0).toFixed(3)}/day</strong></span>}
                 </div>
               </div>
+              {(() => { const sm = parseStockMeta(eq.notes||""); if (sm.stock==null && sm.issued==null && sm.written==null) return null;
+                return (
+                  <div style={{fontSize:11,color:"#475569",marginBottom:8,lineHeight:1.5,background:"#f8fafc",borderRadius:8,padding:"6px 8px"}}>
+                    {sm.purchased!=null && <span>Purchased <b>{sm.purchased}</b> · </span>}
+                    {sm.stock!=null && <span style={{color:"#059669"}}>Stock <b>{sm.stock}</b> · </span>}
+                    {sm.issued!=null && <span style={{color:"#4f46e5"}}>Issued <b>{sm.issued}</b> · </span>}
+                    {sm.written!=null && sm.written>0 && <span style={{color:"#dc2626"}}>Written-off <b>{sm.written}</b></span>}
+                  </div>
+                );
+              })()}
               {isRental(eq) && parseRentMeta(eq.notes||"").due && (
                 <div style={{fontSize:11,color:"#b45309",marginBottom:10,fontWeight:600}}>Next rent due: {parseRentMeta(eq.notes||"").due}{parseRentMeta(eq.notes||"").amt!=null?` · OMR ${parseRentMeta(eq.notes||"").amt}`:""}</div>
               )}
