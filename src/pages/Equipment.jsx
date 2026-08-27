@@ -155,8 +155,8 @@ function printEquipmentReport(equip, company = {}) {
               <th>Name / Type</th>
               <th style="width:52px">Own/Rent</th>
               <th style="width:40px">Qty</th>
-              <th style="width:40px">Stock</th>
-              <th style="width:42px">Issued</th>
+              <th style="width:48px">Not issued</th>
+              <th style="width:48px">Issued use</th>
               <th style="width:48px">W/Off</th>
               <th style="width:72px">Status</th>
               <th style="width:70px">Site</th>
@@ -272,7 +272,7 @@ function printEquipmentReport(equip, company = {}) {
         </div>
         <table>
           <thead><tr>
-            <th>Item</th><th>Purchased</th><th>Stock</th><th>Issued</th><th>Written-off</th><th>Status</th>
+            <th>Item</th><th>Purchased</th><th>Not issued</th><th>Issued use</th><th>Written-off</th><th>Status</th>
           </tr></thead>
           <tbody>${lines}</tbody>
         </table>
@@ -506,8 +506,8 @@ export default function Equipment(){
                 return (
                   <div style={{fontSize:11,color:"#475569",marginBottom:8,lineHeight:1.5,background:"#f8fafc",borderRadius:8,padding:"6px 8px"}}>
                     {sm.purchased!=null && <span>Purchased <b>{sm.purchased}</b> · </span>}
-                    {sm.stock!=null && <span style={{color:"#059669"}}>Stock <b>{sm.stock}</b> · </span>}
-                    {sm.issued!=null && <span style={{color:"#4f46e5"}}>Issued <b>{sm.issued}</b> · </span>}
+                    {sm.stock!=null && <span style={{color:"#059669"}}>Not issued <b>{sm.stock}</b> · </span>}
+                    {sm.issued!=null && <span style={{color:"#4f46e5"}}>Issued for use <b>{sm.issued}</b> · </span>}
                     {sm.written!=null && sm.written>0 && <span style={{color:"#dc2626"}}>Written-off <b>{sm.written}</b></span>}
                   </div>
                 );
