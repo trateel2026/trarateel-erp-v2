@@ -182,9 +182,15 @@ export default function Ledger() {
     if (p === "Reset") { setStartDate(""); setEndDate(""); }
   };
 
-  // Tracking-only account names (e.g. Deepu) — their entries are hidden from cashbook + totals
+  // Tracking-only accounts (COMPANY etc.) — hidden from cashbook + totals
+  // Match by payment_mode name OR bank_account_id (entries often use payment_mode "Online")
   const trackingOnlyNames = bankAccounts.filter(a => a.include_in_balance === false).map(a => a.account_name);
-  const visibleEntries = entries.filter(e => !trackingOnlyNames.includes(e.payment_mode));
+  const trackingOnlyIds = new Set(bankAccounts.filter(a => a.include_in_balance === false).map(a => a.id));
+  const isTrackingOnly = (e) =>
+    trackingOnlyNames.includes(e.payment_mode) ||
+    e.payment_mode === "COMPANY ACCOUNT" ||
+    (e.bank_account_id && trackingOnlyIds.has(e.bank_account_id));
+  const visibleEntries = entries.filter(e => !isTrackingOnly(e));
 
   const filtered = visibleEntries.filter(e =>
     (filter === "All double entries" || e.type === filter) &&
