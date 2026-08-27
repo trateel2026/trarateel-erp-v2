@@ -43,6 +43,31 @@ function buildNotes(base, rentDue, rentAmt) {
 }
 
 
+
+const CATEGORY_ORDER = [
+  "Power Tool",
+  "Hand Tools",
+  "Site Tools",
+  "PPE",
+  "Formwork Accessories",
+  "Scaffolding / Formwork",
+  "Site Amenities",
+  "Other",
+];
+function categoryRank(type) {
+  const t = (type || "Other").trim();
+  const i = CATEGORY_ORDER.indexOf(t);
+  return i >= 0 ? i : CATEGORY_ORDER.length;
+}
+function sortByCategory(list) {
+  return [...list].sort((a, b) => {
+    const ra = categoryRank(a.type);
+    const rb = categoryRank(b.type);
+    if (ra !== rb) return ra - rb;
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
+}
+
 function printEquipmentReport(equip, company = {}) {
   const isRent = (e) => {
     if (!e) return false;
@@ -59,8 +84,8 @@ function printEquipmentReport(equip, company = {}) {
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  const own = equip.filter(e => !isRent(e));
-  const rent = equip.filter(e => isRent(e));
+  const own = sortByCategory(equip.filter(e => !isRent(e)));
+  const rent = sortByCategory(equip.filter(e => isRent(e)));
   const cleanNotes = (n) => String(n || "")
     .replace(/\[RENT_DUE:[^\]]*\]/g, "")
     .replace(/\[RENT_AMT:[^\]]*\]/g, "")
@@ -68,12 +93,24 @@ function printEquipmentReport(equip, company = {}) {
     .trim();
 
   const section = (list, title, accent) => {
-    const rows = list.map((e, i) => {
-      const tag = isRent(e) ? "RENT" : "OWN";
-      const tagBg = isRent(e) ? "#fff7ed" : "#ecfdf5";
-      const tagFg = isRent(e) ? "#c2410c" : "#047857";
-      return `<tr>
-        <td class="c">${i + 1}</td>
+    let rows = "";
+    let lastType = null;
+    let i = 0;
+    if (!list.length) {
+      rows = `<tr><td colspan="8" class="empty">No items in this group</td></tr>`;
+    } else {
+      list.forEach((e) => {
+        const t = (e.type || "Other").trim() || "Other";
+        if (t !== lastType) {
+          rows += `<tr><td colspan="8" style="background:#f1f5f9;font-weight:800;font-size:10px;color:#334155;padding:6px 8px;text-transform:uppercase;letter-spacing:0.03em">${t}</td></tr>`;
+          lastType = t;
+        }
+        i += 1;
+        const tag = isRent(e) ? "RENT" : "OWN";
+        const tagBg = isRent(e) ? "#fff7ed" : "#ecfdf5";
+        const tagFg = isRent(e) ? "#c2410c" : "#047857";
+        rows += `<tr>
+        <td class="c">${i}</td>
         <td><div class="name">${e.name || "—"}</div><div class="sub">${e.type || ""}</div></td>
         <td class="c"><span class="badge" style="background:${tagBg};color:${tagFg}">${tag}</span></td>
         <td class="c num">${e.quantity ?? 1}</td>
@@ -82,7 +119,8 @@ function printEquipmentReport(equip, company = {}) {
         <td>${e.operator || "—"}</td>
         <td class="notes">${cleanNotes(e.notes).slice(0, 100)}</td>
       </tr>`;
-    }).join("") || `<tr><td colspan="8" class="empty">No items in this group</td></tr>`;
+      });
+    }
     return `
       <div class="section">
         <div class="section-hd" style="border-left:4px solid ${accent}">
@@ -208,7 +246,7 @@ export default function Equipment(){
   const[showTransfer,setShowTransfer]=useState(null);const[transferSite,setTransferSite]=useState("");const[transferCustom,setTransferCustom]=useState("");
 
   const load=async()=>{
-    const[e,s,p]=await Promise.all([supabase.from("equipment").select("*").order("name"),supabase.from("equipment_schedule").select("*").order("start_date",{ascending:false}),supabase.from("projects").select("name,site").order("name")]);
+    const[e,s,p]=await Promise.all([supabase.from("equipment").select("*").order("type").order("name"),supabase.from("equipment_schedule").select("*").order("start_date",{ascending:false}),supabase.from("projects").select("name,site").order("name")]);
     setEquip(e.data||[]);setSchedules(s.data||[]);
     const allSites=new Set();(p.data||[]).forEach(pr=>{if(pr.name)allSites.add(pr.name);if(pr.site)allSites.add(pr.site);});(e.data||[]).forEach(eq=>{if(eq.current_site)allSites.add(eq.current_site);});
     setSites([...allSites].filter(Boolean).sort());
@@ -315,12 +353,22 @@ export default function Equipment(){
     logActivity("Transferred",`${eq?.name}: ${eq?.current_site} → ${site}`,"Equipment");
     showMsg("✅ Transferred!");setShowTransfer(null);setTransferSite("");setTransferCustom("");await load();setSaving(false);};
 
-  const filtered=equip.filter(e=>{
+  const filtered=sortByCategory(equip.filter(e=>{
     if(filterStatus!=="All"&&e.status!==filterStatus) return false;
     if(filterOwn==="Own"&&isRental(e)) return false;
     if(filterOwn==="Rented"&&!isRental(e)) return false;
     return true;
-  });
+  }));
+  // Group filtered by category for section headers
+  const filteredGroups = (() => {
+    const g = {};
+    filtered.forEach(e => {
+      const k = (e.type || "Other").trim() || "Other";
+      if (!g[k]) g[k] = [];
+      g[k].push(e);
+    });
+    return Object.keys(g).sort((a,b)=>categoryRank(a)-categoryRank(b)).map(k => ({ type: k, items: g[k] }));
+  })();
   const ownCount=equip.filter(e=>!isRental(e)).length;
   const rentCount=equip.filter(e=>isRental(e)).length;
   const stColor=(s)=>s==="Available"?"#10b981":s==="In Use"?"#6366f1":s==="Maintenance"?"#f59e0b":"#94a3b8";
@@ -376,8 +424,16 @@ export default function Equipment(){
           ))}
         </div>
         <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap"}}>{["All",...STATUSES].map(s=>(<button key={s} onClick={()=>setFilterStatus(s)} style={{padding:"6px 14px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,background:filterStatus===s?"#6366f1":"#f1f5f9",color:filterStatus===s?"#fff":"#64748b"}}>{s}</button>))}</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-          {filtered.map(eq=>{const sc=stColor(eq.status);return(
+        <div>
+          {filteredGroups.map(group => (
+            <div key={group.type} style={{marginBottom:22}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#0f172a",letterSpacing:0.02}}>{group.type || "Other"}</div>
+                <div style={{flex:1,height:1,background:"#e2e8f0"}}/>
+                <div style={{fontSize:11,fontWeight:600,color:"#94a3b8"}}>{group.items.length}</div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+          {group.items.map(eq=>{const sc=stColor(eq.status);return(
             <div key={eq.id} style={{background:"#fff",borderRadius:12,padding:18,border:"1px solid #e2e8f0"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:8,flexWrap:"wrap"}}>
                 <div style={{fontWeight:700,fontSize:16,color:"#0f172a"}}>{eq.name}</div>
@@ -408,6 +464,9 @@ export default function Equipment(){
                 <button onClick={()=>deleteEquip(eq)} style={{background:"#fef2f2",color:"#ef4444",border:"none",borderRadius:8,padding:"7px 10px",fontSize:12,cursor:"pointer"}}>🗑</button>
               </div>)}
             </div>);})}
+              </div>
+            </div>
+          ))}
         </div>
         {filtered.length===0&&<div style={{padding:40,textAlign:"center",color:"#94a3b8",background:"#f8fafc",borderRadius:12}}>No equipment. Click "+ Add Equipment".</div>}
       </div>)}
