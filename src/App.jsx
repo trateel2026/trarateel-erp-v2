@@ -160,7 +160,7 @@ function AppContent() {
             <div style={{ width: 18, height: 18, background: "#1e293b", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#60a5fa", fontWeight: 700 }}>M</div>
             <span style={{ fontSize: 11, color: "#64748b" }}>Powered by <span style={{ color: "#94a3b8", fontWeight: 600 }}>Minarva Biz</span></span>
           </div>
-          <button onClick={logout} style={{ width: "100%", background: "#1e293b", color: "#f87171", border: "1px solid #f87171", borderRadius: 8, padding: "7px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>🔓 Logout</button>
+          <button onClick={logout} style={{ width: "100%", background: "#7f1d1d", color: "#fecaca", border: "1px solid #f87171", borderRadius: 8, padding: "10px", fontSize: 13, cursor: "pointer", fontWeight: 700, marginTop: 4 }}>🔓 Logout</button>
         </div>
       </aside>
 
@@ -184,6 +184,10 @@ function AppContent() {
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: isAdmin?"#10b981":"#6366f1", background: isAdmin?"#ecfdf5":"#eef2ff", borderRadius: 6, padding: "4px 10px", border: `1px solid ${isAdmin?"#86efac":"#c7d2fe"}` }}>
               👤 {currentUser?.display_name || "User"} · {currentUser?.role || ""}
             </div>
+            <button onClick={logout} title="Logout"
+              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>
+              🔓 Logout
+            </button>
           </div>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>
