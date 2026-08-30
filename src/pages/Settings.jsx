@@ -572,21 +572,83 @@ function UserManagement() {
 }
 
 function ActivityLogCard() {
-  const [logs, setLogs] = useState([]);const [loading, setLoading] = useState(true);const [expanded, setExpanded] = useState(false);
-  useEffect(() => { supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(200).then(({ data }) => { setLogs(data || []); setLoading(false); }); }, []);
-  const shown = expanded ? logs : logs.slice(0, 12);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [userFilter, setUserFilter] = useState("All");
+  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const load = () => {
+    setLoading(true);
+    supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(500)
+      .then(({ data }) => { setLogs(data || []); setLoading(false); });
+  };
+  useEffect(() => { load(); }, []);
+
+  const users = Array.from(new Set(logs.map(l => l.username || l.display_name).filter(Boolean))).sort();
+  const filtered = logs.filter(l => {
+    if (userFilter !== "All" && (l.username !== userFilter && l.display_name !== userFilter)) return false;
+    if (fromDate && (l.created_at || "").slice(0, 10) < fromDate) return false;
+    if (toDate && (l.created_at || "").slice(0, 10) > toDate) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const hay = `${l.action||""} ${l.detail||""} ${l.page||""} ${l.username||""} ${l.display_name||""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const shown = expanded ? filtered : filtered.slice(0, 25);
   const fmt = (ts) => { try { return new Date(ts).toLocaleString(); } catch { return ts; } };
-  return (<div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:14, padding:20, marginBottom:16 }}>
-    <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:4 }}>🕓 Activity Log</div>
-    <div style={{ fontSize:11, color:"#64748b", marginBottom:12 }}>Who did what, when.</div>
-    {loading ? <div style={{color:"#94a3b8",fontSize:12,padding:12}}>Loading...</div>
-      : logs.length===0 ? <div style={{color:"#94a3b8",fontSize:12,padding:12}}>No activity yet.</div>
-      : (<div style={{maxHeight:expanded?"none":360,overflowY:"auto"}}>
-        {shown.map(l=>(<div key={l.id} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"8px 0",borderBottom:"1px solid #f1f5f9",fontSize:12}}>
-          <div><div style={{fontWeight:700,color:"#1e293b"}}>{l.action} {l.page?<span style={{color:"#94a3b8",fontWeight:400}}>· {l.page}</span>:null}</div>{l.detail?<div style={{color:"#64748b",fontSize:11}}>{l.detail}</div>:null}</div>
-          <div style={{textAlign:"right",whiteSpace:"nowrap"}}><div style={{color:"#6366f1",fontWeight:600}}>{l.display_name||l.username}</div><div style={{color:"#94a3b8",fontSize:10}}>{fmt(l.created_at)}</div></div>
-        </div>))}
-        {logs.length>12&&(<button onClick={()=>setExpanded(e=>!e)} style={{marginTop:10,background:"#f1f5f9",color:"#475569",border:"none",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:12,fontWeight:600}}>{expanded?"Show less":`Show all ${logs.length}`}</button>)}
-      </div>)}
-  </div>);
+
+  return (
+    <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:14, padding:20, marginBottom:16 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, flexWrap:"wrap", marginBottom:10 }}>
+        <div>
+          <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", marginBottom:2 }}>🕓 Activity Log</div>
+          <div style={{ fontSize:11, color:"#64748b" }}>Login / logout and actions by each user · {filtered.length} shown</div>
+        </div>
+        <button onClick={load} style={{ background:"#f1f5f9", color:"#475569", border:"none", borderRadius:8, padding:"7px 14px", cursor:"pointer", fontSize:12, fontWeight:600 }}>↻ Refresh</button>
+      </div>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:12 }}>
+        <select value={userFilter} onChange={e=>setUserFilter(e.target.value)}
+          style={{ border:"1px solid #e2e8f0", borderRadius:8, padding:"7px 10px", fontSize:12, background:"#fff" }}>
+          <option value="All">All users</option>
+          {users.map(u => <option key={u} value={u}>{u}</option>)}
+        </select>
+        <input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)}
+          style={{ border:"1px solid #e2e8f0", borderRadius:8, padding:"7px 10px", fontSize:12 }} title="From date" />
+        <input type="date" value={toDate} onChange={e=>setToDate(e.target.value)}
+          style={{ border:"1px solid #e2e8f0", borderRadius:8, padding:"7px 10px", fontSize:12 }} title="To date" />
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search action / detail..."
+          style={{ flex:1, minWidth:140, border:"1px solid #e2e8f0", borderRadius:8, padding:"7px 10px", fontSize:12 }} />
+      </div>
+      {loading ? <div style={{color:"#94a3b8",fontSize:12,padding:12}}>Loading...</div>
+        : filtered.length===0 ? <div style={{color:"#94a3b8",fontSize:12,padding:12}}>No activity yet.</div>
+        : (<div style={{maxHeight:expanded?560:380,overflowY:"auto"}}>
+          {shown.map(l=>(
+            <div key={l.id} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"9px 0",borderBottom:"1px solid #f1f5f9",fontSize:12}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontWeight:700,color:"#1e293b"}}>
+                  {l.action}
+                  {l.page ? <span style={{color:"#94a3b8",fontWeight:400}}> · {l.page}</span> : null}
+                </div>
+                {l.detail ? <div style={{color:"#64748b",fontSize:11,marginTop:2}}>{l.detail}</div> : null}
+              </div>
+              <div style={{textAlign:"right",whiteSpace:"nowrap",flexShrink:0}}>
+                <div style={{color:"#6366f1",fontWeight:600}}>{l.display_name||l.username}</div>
+                <div style={{color:"#94a3b8",fontSize:10}}>{fmt(l.created_at)}</div>
+              </div>
+            </div>
+          ))}
+          {filtered.length>25 && (
+            <button onClick={()=>setExpanded(e=>!e)}
+              style={{marginTop:10,background:"#f1f5f9",color:"#475569",border:"none",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:12,fontWeight:600}}>
+              {expanded ? "Show less" : `Show all ${filtered.length}`}
+            </button>
+          )}
+        </div>)}
+    </div>
+  );
 }

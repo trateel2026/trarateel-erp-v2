@@ -86,9 +86,18 @@ export function AdminProvider({ children }) {
         setLoggedIn(true);
         setShowLogin(false);
         sessionStorage.setItem("minarva_user", JSON.stringify(user));
-        // Update last_login
-        // last_login column may not exist — ignore errors
-        // supabase.from("app_users").update({ last_login: new Date().toISOString() }).eq("id", data.id);
+        try {
+          await supabase.from("app_users").update({ last_login: new Date().toISOString() }).eq("id", data.id);
+        } catch {}
+        try {
+          await supabase.from("activity_log").insert({
+            username: user.username,
+            display_name: user.display_name || user.username,
+            action: "Logged in",
+            detail: `Role: ${user.role}`,
+            page: "Login",
+          });
+        } catch {}
         return true;
       }
     } catch {}
@@ -101,6 +110,15 @@ export function AdminProvider({ children }) {
       setLoggedIn(true);
       setShowLogin(false);
       sessionStorage.setItem("minarva_user", JSON.stringify(user));
+      try {
+        await supabase.from("activity_log").insert({
+          username: "admin",
+          display_name: "Administrator",
+          action: "Logged in",
+          detail: "Fallback admin login",
+          page: "Login",
+        });
+      } catch {}
       return true;
     }
 
@@ -109,6 +127,18 @@ export function AdminProvider({ children }) {
   };
 
   const logout = () => {
+    const u = currentUser;
+    if (u) {
+      try {
+        supabase.from("activity_log").insert({
+          username: u.username || "unknown",
+          display_name: u.display_name || u.username || "Unknown",
+          action: "Logged out",
+          detail: "",
+          page: "Login",
+        });
+      } catch {}
+    }
     setCurrentUser(null);
     setIsAdmin(false);
     setLoggedIn(false);
