@@ -114,13 +114,17 @@ function AppContent() {
           </div>
           {/* Current user info */}
           <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: "#f1f5f9", fontWeight: 600 }}>👤 {currentUser?.display_name || "User"}</div>
                 <div style={{ fontSize: 10, color: "#94a3b8" }}>{currentUser?.role || "Viewer"}</div>
               </div>
-              <span style={{ background: isAdmin ? "#064e3b" : "#1e3a5f", color: isAdmin ? "#34d399" : "#60a5fa", fontSize: 9, padding: "2px 8px", borderRadius: 4, border: `1px solid ${isAdmin ? "#34d399" : "#3b82f6"}`, fontWeight: 700 }}>{currentUser?.role === "Admin" ? "ADMIN" : currentUser?.role?.toUpperCase() || "USER"}</span>
+              <span style={{ background: isAdmin ? "#064e3b" : "#1e3a5f", color: isAdmin ? "#34d399" : "#60a5fa", fontSize: 9, padding: "2px 8px", borderRadius: 4, border: `1px solid ${isAdmin ? "#34d399" : "#3b82f6"}`, fontWeight: 700, flexShrink: 0 }}>{currentUser?.role === "Admin" ? "ADMIN" : currentUser?.role?.toUpperCase() || "USER"}</span>
             </div>
+            <button onClick={() => { logout(); setSidebarOpen(false); }}
+              style={{ width: "100%", marginTop: 8, background: "#7f1d1d", color: "#fecaca", border: "1px solid #f87171", borderRadius: 6, padding: "8px", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>
+              🔓 Logout
+            </button>
           </div>
         </div>
 
@@ -172,20 +176,20 @@ function AppContent() {
               style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, color: "#64748b", fontSize: 20 }}>
               ☰
             </button>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", letterSpacing: 0.5 }}>TRATEEL AL NAJAH FOR TRADING</div>
+            <div className="hdr-title" style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", letterSpacing: 0.5 }}>TRATEEL AL NAJAH FOR TRADING</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <div className="hdr-desktop-only" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b" }}>
               <span style={{ fontSize: 13 }}>🌐</span> Sultanate of Oman Portal
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#10b981" }}>
+            <div className="hdr-desktop-only" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#10b981" }}>
               <div style={{ width: 7, height: 7, background: "#10b981", borderRadius: "50%" }} /> Supabase Cloud (Live)
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: isAdmin?"#10b981":"#6366f1", background: isAdmin?"#ecfdf5":"#eef2ff", borderRadius: 6, padding: "4px 10px", border: `1px solid ${isAdmin?"#86efac":"#c7d2fe"}` }}>
+            <div className="hdr-user-chip" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: isAdmin?"#10b981":"#6366f1", background: isAdmin?"#ecfdf5":"#eef2ff", borderRadius: 6, padding: "4px 10px", border: `1px solid ${isAdmin?"#86efac":"#c7d2fe"}` }}>
               👤 {currentUser?.display_name || "User"} · {currentUser?.role || ""}
             </div>
-            <button onClick={logout} title="Logout"
-              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>
+            <button onClick={logout} title="Logout" className="hdr-logout-btn"
+              style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}>
               🔓 Logout
             </button>
           </div>

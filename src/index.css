@@ -87,3 +87,35 @@ body {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* Header: keep Logout visible on mobile */
+@media (max-width: 768px) {
+  .hdr-desktop-only {
+    display: none !important;
+  }
+  .hdr-title {
+    font-size: 11px !important;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hdr-user-chip {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+  }
+  .hdr-logout-btn {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+}
+@media (max-width: 400px) {
+  .hdr-user-chip {
+    display: none !important;
+  }
+}
