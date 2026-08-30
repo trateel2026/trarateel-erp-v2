@@ -21,7 +21,7 @@ const COMPANY_FIELDS = [
 ];
 
 export default function Settings() {
-  const { isAdmin, setShowLogin } = useAdmin();
+  const { isAdmin, canView, setShowLogin } = useAdmin();
   const [settings, setSettings] = useState({});
   const [saving, setSaving] = useState({});
   const [msg, setMsg] = useState({ text:"", type:"" });
@@ -121,16 +121,28 @@ export default function Settings() {
     setRestoring(false);
   };
 
-  if (!isAdmin) return (
+  // Admin: full settings. Deepu (settings.view): Activity Log only.
+  if (!isAdmin && !canView("settings")) return (
     <div style={{padding:24}}>
       <div style={{background:"#fff",borderRadius:12,padding:60,textAlign:"center",border:"1px solid #e2e8f0"}}>
         <div style={{fontSize:48,marginBottom:16}}>🔒</div>
-        <div style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:8}}>Admin Access Required</div>
-        <div style={{fontSize:13,color:"#64748b",marginBottom:24}}>Settings are only accessible to admin users.</div>
-        <button onClick={()=>setShowLogin(true)} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:10,padding:"12px 32px",fontSize:14,fontWeight:700,cursor:"pointer"}}>🔑 Admin Login</button>
+        <div style={{fontSize:20,fontWeight:800,color:"#0f172a",marginBottom:8}}>Access Required</div>
+        <div style={{fontSize:13,color:"#64748b",marginBottom:24}}>You do not have permission to view this page.</div>
+        <button onClick={()=>setShowLogin(true)} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:10,padding:"12px 32px",fontSize:14,fontWeight:700,cursor:"pointer"}}>🔑 Login</button>
       </div>
     </div>
   );
+
+  if (!isAdmin && canView("settings")) return (
+    <div style={{padding:24,maxWidth:960,margin:"0 auto"}}>
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:20,fontWeight:800,color:"#0f172a"}}>🕓 Activity Log</div>
+        <div style={{fontSize:13,color:"#64748b"}}>Who logged in and what they did in the software</div>
+      </div>
+      <ActivityLogCard />
+    </div>
+  );
+
 
   const inp = {width:"100%",border:"1px solid #e2e8f0",borderRadius:8,padding:"10px 14px",fontSize:13,boxSizing:"border-box",outline:"none"};
   const Card = ({title,children}) => (
