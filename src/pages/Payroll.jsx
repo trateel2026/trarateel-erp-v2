@@ -289,7 +289,7 @@ function AttendanceGrid({ employees, attendance, period, isAdmin, onSave, confir
 
   // Group employees
   const groups = {};
-  employees.filter(e => e.status === "Active").forEach(e => {
+  employees.filter(e => e.status === "Active" && (e.staff_type || "") !== "Fixed Monthly").forEach(e => {
     const g = e.emp_group || "Group 1";
     if (!groups[g]) groups[g] = [];
     groups[g].push(e);
@@ -518,12 +518,16 @@ export default function Payroll() {
   const periodAtt = (empId) => { const filtered = attendance.filter(a => { const d = a.att_date || a.work_date; return a.employee_id === empId && d >= selectedPeriod.start && d <= selectedPeriod.end; }); const byDate = {}; filtered.forEach(a => { byDate[a.att_date || a.work_date] = a; }); return Object.values(byDate); };
 
   const calcPayroll = (emp) => {
-    const att = periodAtt(emp.id);
+    const isFixedMonthly = (emp.staff_type || "") === "Fixed Monthly";
+    const att = isFixedMonthly ? [] : periodAtt(emp.id);
     const totalHours = parseFloat(att.reduce((s, a) => s + parseFloat(a.hours_worked || 0), 0).toFixed(2));
-    const totalDays = parseFloat((totalHours / WORK_HOURS).toFixed(2));
+    const totalDays = isFixedMonthly ? 0 : parseFloat((totalHours / WORK_HOURS).toFixed(2));
     let totalOt = 0, totalLt = 0; att.forEach(a => { const h = parseFloat(a.hours_worked || 0); if (h > WORK_HOURS) totalOt += (h - WORK_HOURS); else if (h > 0 && h < WORK_HOURS) totalLt += (WORK_HOURS - h); }); totalOt = parseFloat(totalOt.toFixed(2)); totalLt = parseFloat(totalLt.toFixed(2));
     const dailyRate = parseFloat(emp.daily_rate || 0);
-    const grossSalary = parseFloat((dailyRate * totalDays).toFixed(3));
+    // Fixed Monthly (DEEPU): daily_rate = full monthly package; no attendance required
+    const grossSalary = isFixedMonthly
+      ? parseFloat(dailyRate.toFixed(3))
+      : parseFloat((dailyRate * totalDays).toFixed(3));
     const pr = payrollRecords.find(p => p.employee_id === emp.id && p.period_start === selectedPeriod.start);
     const df = deductForms[emp.id] || {};
     const advance = pr ? parseFloat(pr.advance_deduction || 0) : parseFloat(df.advance || 0);
@@ -915,7 +919,11 @@ export default function Payroll() {
                         <td style={{ padding: "11px 14px", color: "#64748b", fontSize: 12 }}>{e.nationality || "—"}</td>
                         <td style={{ padding: "11px 14px" }}><span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 600 }}>{e.staff_type || "Own"}</span></td>
                         <td style={{ padding: "11px 14px", color: "#64748b", fontSize: 12 }}>{e.phone || "—"}</td>
-                        <td style={{ padding: "11px 14px", color: "#6366f1", fontWeight: 700 }}>OMR {parseFloat(e.daily_rate || 0).toFixed(3)}</td>
+                        <td style={{ padding: "11px 14px", color: "#6366f1", fontWeight: 700 }}>
+                          {(e.staff_type || "") === "Fixed Monthly"
+                            ? <>OMR {parseFloat(e.daily_rate || 0).toFixed(3)}<div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>Fixed / month · no attendance</div></>
+                            : <>OMR {parseFloat(e.daily_rate || 0).toFixed(3)}<div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 500 }}>/day · {(parseFloat(e.daily_rate||0)/10).toFixed(3)}/hr</div></>}
+                        </td>
                         <td style={{ padding: "11px 14px" }}><span style={{ background: e.status === "Active" ? "#ecfdf5" : "#fef2f2", color: e.status === "Active" ? "#10b981" : "#ef4444", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>{e.status}</span></td>
                         <td style={{ padding: "11px 14px", fontSize: 11 }}>
                           <span style={{ color: "#10b981", fontWeight: 600 }}>{c.totalDays}d</span> / <span style={{ color: "#6366f1", fontWeight: 600 }}>OMR {c.grossSalary.toFixed(3)}</span>
@@ -931,7 +939,7 @@ export default function Payroll() {
                       {viewEmp?.id === e.id && (
                         <tr key={`d-${e.id}`}><td colSpan={9} style={{ padding: "0 14px 14px" }}>
                           <div style={{ background: "#f8fafc", borderRadius: 10, padding: 14, border: "1px solid #e2e8f0", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, fontSize: 12 }}>
-                            {[["Designation", e.role], ["Nationality", e.nationality], ["Group", e.emp_group || "Group 1"], ["Join Date", e.join_date || "—"], ["Oman Phone", e.phone], ["Home Phone", e.phone_home || "—"], ["Passport", e.passport_no || "—"], ["PTAKA", e.ptaka_no || "—"], ["Visa", e.visa_no || "—"], ["Bank", e.bank_name || "—"], ["Branch", e.bank_branch || "—"], ["Account", e.account_no || "—"], ["IBAN", e.iban || "—"], ["Daily Rate", `OMR ${parseFloat(e.daily_rate || 0).toFixed(3)}`]].map(([l, v]) => (
+                            {[["Designation", e.role], ["Nationality", e.nationality], ["Group", e.emp_group || "Group 1"], ["Join Date", e.join_date || "—"], ["Oman Phone", e.phone], ["Home Phone", e.phone_home || "—"], ["Passport", e.passport_no || "—"], ["PTAKA", e.ptaka_no || "—"], ["Visa", e.visa_no || "—"], ["Bank", e.bank_name || "—"], ["Branch", e.bank_branch || "—"], ["Account", e.account_no || "—"], ["IBAN", e.iban || "—"], ["Rate", (e.staff_type||"")==="Fixed Monthly" ? `OMR ${parseFloat(e.daily_rate||0).toFixed(3)} fixed/month` : `OMR ${parseFloat(e.daily_rate||0).toFixed(3)}/day · ${(parseFloat(e.daily_rate||0)/10).toFixed(3)}/hr`]].map(([l, v]) => (
                               <div key={l} style={{ background: "#fff", borderRadius: 8, padding: "8px 12px", border: "1px solid #e2e8f0" }}>
                                 <div style={{ color: "#94a3b8", fontSize: 10 }}>{l}</div>
                                 <div style={{ color: "#1e293b", fontWeight: 600 }}>{v}</div>
@@ -952,7 +960,7 @@ export default function Payroll() {
       {/* ── ATTENDANCE GRID TAB ── */}
       <div style={{display: tab === 'attendance' ? 'block' : 'none'}}>
         <AttendanceGrid
-          employees={employees.filter(e => e.status === "Active")}
+          employees={employees.filter(e => e.status === "Active" && (e.staff_type || "") !== "Fixed Monthly")}
           attendance={attendance}
           period={selectedPeriod}
           isAdmin={isAdmin}
