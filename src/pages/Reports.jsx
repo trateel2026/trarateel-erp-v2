@@ -12,7 +12,69 @@ const parseYMD = (s) => {
   const [y, m, d] = (s || "").split("-").map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 };
+
 const STD_WORK_HOURS = 10;
+
+function getPeriodDates(year, month) {
+  const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const nm = month === 11 ? 0 : month + 1;
+  const ny = month === 11 ? year + 1 : year;
+  const start = `${year}-${String(month+1).padStart(2,"0")}-26`;
+  const end = `${ny}-${String(nm+1).padStart(2,"0")}-25`;
+  const label = `${M[month]}-${M[nm]} (${year})`;
+  return { start, end, label, year, month };
+}
+function getSalaryPeriods() {
+  const now = new Date(); const out = [];
+  for (let i = 0; i < 12; i++) {
+    let m = now.getMonth() - i, y = now.getFullYear();
+    while (m < 0) { m += 12; y--; }
+    out.push(getPeriodDates(y, m));
+  }
+  return out;
+}
+function calcSalaryForEmp(emp, attendance, payments, period) {
+  const isFixed = (emp.staff_type || "") === "Fixed Monthly";
+  const dailyRate = parseFloat(emp.daily_rate || 0);
+  if (isFixed) {
+    const periodPay = (payments || []).filter(p => p.employee_id === emp.id && p.payment_date >= period.start && p.payment_date <= period.end)
+      .reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    return {
+      isFixed: true, totalHours: 0, totalDays: 0, totalOt: 0, totalLt: 0,
+      dailyRate, hourlyRate: 0, grossSalary: parseFloat(dailyRate.toFixed(3)),
+      advances: periodPay, netSalary: parseFloat((dailyRate - periodPay).toFixed(3)),
+    };
+  }
+  const byDate = {};
+  (attendance || []).forEach(a => {
+    if (a.employee_id !== emp.id) return;
+    const d = a.att_date || a.work_date;
+    if (!d || d < period.start || d > period.end) return;
+    byDate[d] = a;
+  });
+  const att = Object.values(byDate);
+  let totalHours = 0, totalOt = 0, totalLt = 0;
+  att.forEach(a => {
+    const h = parseFloat(a.hours_worked || 0);
+    totalHours += h;
+    if (h > STD_WORK_HOURS) totalOt += (h - STD_WORK_HOURS);
+    else if (h > 0 && h < STD_WORK_HOURS) totalLt += (STD_WORK_HOURS - h);
+  });
+  totalHours = parseFloat(totalHours.toFixed(2));
+  totalOt = parseFloat(totalOt.toFixed(2));
+  totalLt = parseFloat(totalLt.toFixed(2));
+  const totalDays = parseFloat((totalHours / STD_WORK_HOURS).toFixed(2));
+  const grossSalary = parseFloat((dailyRate * totalDays).toFixed(3));
+  const advances = (payments || []).filter(p => p.employee_id === emp.id && p.payment_date >= period.start && p.payment_date <= period.end)
+    .reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+  return {
+    isFixed: false, totalHours, totalDays, totalOt, totalLt,
+    dailyRate, hourlyRate: parseFloat((dailyRate / STD_WORK_HOURS).toFixed(4)),
+    grossSalary, advances: parseFloat(advances.toFixed(3)),
+    netSalary: parseFloat((grossSalary - advances).toFixed(3)),
+  };
+}
+
 
 const downloadExcel = (rows, filename) => {
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -34,7 +96,7 @@ const tabs = [
   { id: "ledger", label: "Cashbook Statement", icon: "📒" },
   { id: "subcontractors", label: "Subcontractor Balances", icon: "🔧" },
   { id: "commissions", label: "Commission Ledger", icon: "💼" },
-  { id: "payroll", label: "Payroll Summary", icon: "👤" },
+  { id: "payroll", label: "Salary Report", icon: "👤" },
   { id: "attendance", label: "📅 Daily Attendance", icon: "📅" },
 ];
 
@@ -61,6 +123,11 @@ export default function Reports() {
   const [bpBills, setBpBills] = useState([]);
   const [bpPayments, setBpPayments] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [salaryPayments, setSalaryPayments] = useState([]);
+  const [salaryPeriods] = useState(() => getSalaryPeriods());
+  const [salaryPeriodIdx, setSalaryPeriodIdx] = useState(0);
+  const [salarySelected, setSalarySelected] = useState({}); // empId -> true
+  const [salaryView, setSalaryView] = useState("summary"); // summary | detail
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [cbFilter, setCbFilter] = useState("All");
   const [suppSubTab, setSuppSubTab] = useState("all");
@@ -70,7 +137,7 @@ export default function Reports() {
 
   const loadAllData = async () => {
     setLoading(true);
-    const [p, s, l, sb, sm, c, e, py, bps, bpb, bpp, att] = await Promise.all([
+    const [p, s, l, sb, sm, c, e, py, bps, bpb, bpp, att, sp] = await Promise.all([
       supabase.from("projects").select("*").order("created_at"),
       supabase.from("schedules").select("*"),
       supabase.from("ledger").select("*").order("entry_date"),
@@ -83,6 +150,7 @@ export default function Reports() {
       supabase.from("bp_bills").select("*").order("bill_date"),
       supabase.from("bp_payments").select("*").order("payment_date"),
       supabase.from("attendance").select("*").order("att_date", { ascending: false }),
+      supabase.from("salary_payments").select("*").order("payment_date", { ascending: false }),
     ]);
     setProjects(p.data || []);
     setSchedules(s.data || []);
@@ -96,6 +164,7 @@ export default function Reports() {
     setBpBills(bpb.data || []);
     setBpPayments(bpp.data || []);
     setAttendance(att.data || []);
+    setSalaryPayments(sp.data || []);
     getBankAccounts().then(setBankAccounts);
     setLoading(false);
   };
@@ -129,7 +198,7 @@ export default function Reports() {
         .green { color: #10b981; } .red { color: #ef4444; } .blue { color: #6366f1; }
         .progress-bar { background: #e2e8f0; height: 6px; border-radius: 4px; }
         .progress-fill { background: #6366f1; height: 6px; border-radius: 4px; }
-        @media print { body { margin: 0; } }
+        @media print { body { margin: 0; } .no-print { display: none !important; } }
       </style></head><body>${content}</body></html>
     `);
     w.document.close();
@@ -266,9 +335,33 @@ export default function Reports() {
             } else if (activeTab === "supplier_statement") {
               fname = "Supplier_Statement";
               rows = bpBills.filter(b => (!startDate || b.bill_date >= startDate) && (!endDate || b.bill_date <= endDate)).map(b => ({ "Date": b.bill_date, "Bill No": b.bill_number||"", "Supplier": suppName(b.supplier_id), "Description": b.description||"", "Net": parseFloat(b.net_amount||0).toFixed(3), "VAT": parseFloat(b.vat_amount||0).toFixed(3), "Total": parseFloat(b.total_amount||0).toFixed(3), "Status": b.status }));
-            } else if (activeTab === "payroll") {
-              fname = "Payroll_Summary";
-              rows = employees.map(emp => { const att = payroll.filter(p=>p.employee_id===emp.id); return { "Employee": emp.name, "Role": emp.role||"", "Daily Rate": emp.daily_rate, "Department": emp.department||"", "Group": emp.group_name||"" }; });
+                        } else if (activeTab === "payroll") {
+              fname = "Salary_Report";
+              const period = salaryPeriods[salaryPeriodIdx] || salaryPeriods[0];
+              const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
+              const selectedIds = Object.keys(salarySelected).filter(id => salarySelected[id]);
+              const list = selectedIds.length ? activeEmps.filter(e => selectedIds.includes(e.id)) : activeEmps;
+              rows = list.map(emp => {
+                const c = calcSalaryForEmp(emp, attendance, salaryPayments, period);
+                return {
+                  "Period": period.label,
+                  "Period Start": period.start,
+                  "Period End": period.end,
+                  "Employee": emp.name,
+                  "Role": emp.role || "",
+                  "Group": emp.emp_group || emp.group_name || "",
+                  "Type": emp.staff_type || "Own Staff",
+                  "Daily Rate": c.dailyRate,
+                  "Hourly Rate": c.hourlyRate,
+                  "Days": c.totalDays,
+                  "OT Hours": c.totalOt,
+                  "LT Hours": c.totalLt,
+                  "Gross (OMR)": c.grossSalary,
+                  "Advances Paid (OMR)": c.advances,
+                  "Net Payable (OMR)": c.netSalary,
+                  "Note": c.isFixed ? "Fixed monthly — no attendance" : "",
+                };
+              });
             } else if (activeTab === "subcontractors") {
               fname = "Subcontractor_Balances";
               rows = subs.map(s => { const ms = subMilestones.filter(m=>m.subcontractor_id===s.id); const contracted = ms.reduce((t,m)=>t+parseFloat(m.amount||0),0); const paid = ms.filter(m=>m.status==="Paid").reduce((t,m)=>t+parseFloat(m.amount||0),0); return { "Subcontractor": s.name, "Trade": s.trade||"", "Contract Value": contracted.toFixed(3), "Paid": paid.toFixed(3), "Balance": (contracted-paid).toFixed(3) }; });
@@ -906,37 +999,171 @@ export default function Reports() {
             </div>
           )}
 
-          {/* PAYROLL */}
-          {activeTab === "payroll" && (
-            <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
-                <KPI label="Total Employees" value={employees.length} unit="staff" color="#6366f1" />
-                <KPI label="Active Employees" value={employees.filter(e=>e.status==="Active").length} unit="staff" color="#10b981" />
-                <KPI label="Total Monthly Salary" value={employees.filter(e=>e.status==="Active").reduce((s,e)=>s+parseFloat(e.salary||0),0).toFixed(3)} color="#f59e0b" />
-              </div>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                <thead><tr style={{ background: "#0f172a", color: "#fff" }}>
-                  {["Employee","Role","Type","Salary (OMR/mo)","Daily Rate","Status"].map(h=>
-                    <th key={h} style={{ padding: "9px 10px", textAlign: "left", fontSize: 10 }}>{h}</th>
-                  )}
-                </tr></thead>
-                <tbody>
-                  {employees.map((e,i) => (
-                    <tr key={e.id} style={{ borderBottom: "1px solid #f1f5f9", background: i%2===0?"#fff":"#f8fafc" }}>
-                      <td style={{ padding: "9px 10px", fontWeight: 600, color: "#1e293b" }}>{e.name}</td>
-                      <td style={{ padding: "9px 10px", color: "#475569" }}>{e.role}</td>
-                      <td style={{ padding: "9px 10px", color: "#6366f1", fontSize: 10 }}>{e.type}</td>
-                      <td style={{ padding: "9px 10px", color: "#10b981", fontWeight: 700 }}>{parseFloat(e.salary||0).toFixed(3)}</td>
-                      <td style={{ padding: "9px 10px", color: "#64748b" }}>{parseFloat(e.daily_rate||0).toFixed(3)}</td>
-                      <td style={{ padding: "9px 10px" }}>
-                        <span style={{ background: e.status==="Active"?"#ecfdf5":"#fef2f2", color: e.status==="Active"?"#10b981":"#ef4444", borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 600 }}>{e.status}</span>
-                      </td>
-                    </tr>
+          {/* SALARY REPORT */}
+          {activeTab === "payroll" && (() => {
+            const period = salaryPeriods[salaryPeriodIdx] || salaryPeriods[0];
+            const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
+            const selectedIds = Object.keys(salarySelected).filter(id => salarySelected[id]);
+            const useSelection = selectedIds.length > 0;
+            const list = useSelection ? activeEmps.filter(e => selectedIds.includes(e.id)) : activeEmps;
+            const rows = list.map(emp => ({ emp, c: calcSalaryForEmp(emp, attendance, salaryPayments, period) }));
+            const sumGross = rows.reduce((s, r) => s + r.c.grossSalary, 0);
+            const sumAdv = rows.reduce((s, r) => s + r.c.advances, 0);
+            const sumNet = rows.reduce((s, r) => s + r.c.netSalary, 0);
+            const sumDays = rows.reduce((s, r) => s + r.c.totalDays, 0);
+            const sumOt = rows.reduce((s, r) => s + r.c.totalOt, 0);
+            const toggleEmp = (id) => setSalarySelected(prev => ({ ...prev, [id]: !prev[id] }));
+            const selectAll = () => {
+              const next = {};
+              activeEmps.forEach(e => { next[e.id] = true; });
+              setSalarySelected(next);
+            };
+            const clearSel = () => setSalarySelected({});
+            return (
+              <div>
+                <div className="no-print" style={{ marginBottom: 16, padding: 14, background: "#f8fafc", borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>SALARY PERIOD (26 → 25)</div>
+                      <select value={salaryPeriodIdx} onChange={e => setSalaryPeriodIdx(Number(e.target.value))}
+                        style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 13, minWidth: 200, background: "#fff" }}>
+                        {salaryPeriods.map((p, i) => (
+                          <option key={p.start} value={i}>{p.label} · {p.start} → {p.end}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>VIEW</div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {[["summary", "All (table)"], ["detail", "Individual detail"]].map(([id, lab]) => (
+                          <button key={id} onClick={() => setSalaryView(id)}
+                            style={{ padding: "8px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                              background: salaryView === id ? "#0f172a" : "#e2e8f0", color: salaryView === id ? "#fff" : "#475569" }}>{lab}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#64748b", paddingBottom: 8 }}>
+                      {useSelection ? `${selectedIds.length} selected` : "No selection = all active staff"}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6, fontWeight: 600 }}>SELECT EMPLOYEES (optional — leave empty for all)</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                    <button onClick={selectAll} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#eef2ff", color: "#6366f1", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Select all</button>
+                    <button onClick={clearSel} style={{ padding: "5px 10px", borderRadius: 6, border: "none", background: "#f1f5f9", color: "#64748b", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Clear</button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {activeEmps.map(emp => (
+                      <label key={emp.id} style={{
+                        display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                        background: salarySelected[emp.id] ? "#0f172a" : "#fff", color: salarySelected[emp.id] ? "#fff" : "#334155",
+                        border: "1px solid " + (salarySelected[emp.id] ? "#0f172a" : "#e2e8f0"),
+                      }}>
+                        <input type="checkbox" checked={!!salarySelected[emp.id]} onChange={() => toggleEmp(emp.id)} style={{ accentColor: "#6366f1" }} />
+                        {emp.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Salary Report — {period.label}</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Period: {period.start} → {period.end} · Standard duty 10 hrs/day · Working-days basis 26/month</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 16 }}>
+                  {[
+                    ["Staff", String(rows.length), "#6366f1"],
+                    ["Total Days", sumDays.toFixed(2), "#0f172a"],
+                    ["Total OT (hrs)", sumOt.toFixed(1), "#f59e0b"],
+                    ["Gross (OMR)", sumGross.toFixed(3), "#10b981"],
+                    ["Net Payable", sumNet.toFixed(3), "#8b5cf6"],
+                  ].map(([l, v, c]) => (
+                    <div key={l} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{l}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: c, marginTop: 4 }}>{v}</div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                </div>
+
+                {salaryView === "summary" && (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: "#0f172a", color: "#fff" }}>
+                        {["#", "Employee", "Role", "Rate", "Days", "OT", "LT", "Gross", "Advances", "Net Payable"].map(h => (
+                          <th key={h} style={{ padding: "9px 10px", textAlign: "left", fontSize: 10 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(({ emp, c }, i) => (
+                        <tr key={emp.id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 ? "#f8fafc" : "#fff" }}>
+                          <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{i + 1}</td>
+                          <td style={{ padding: "8px 10px", fontWeight: 700, color: "#1e293b" }}>{emp.name}
+                            {c.isFixed && <div style={{ fontSize: 10, color: "#6366f1", fontWeight: 600 }}>Fixed monthly</div>}
+                          </td>
+                          <td style={{ padding: "8px 10px", color: "#64748b" }}>{emp.role || "—"}</td>
+                          <td style={{ padding: "8px 10px", color: "#6366f1", fontWeight: 600 }}>
+                            {c.isFixed ? `${c.dailyRate.toFixed(3)}/mo` : `${c.dailyRate.toFixed(3)}/d · ${c.hourlyRate.toFixed(3)}/h`}
+                          </td>
+                          <td style={{ padding: "8px 10px" }}>{c.isFixed ? "—" : c.totalDays.toFixed(2)}</td>
+                          <td style={{ padding: "8px 10px", color: "#f59e0b", fontWeight: 600 }}>{c.totalOt > 0 ? c.totalOt.toFixed(1) : "—"}</td>
+                          <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{c.totalLt > 0 ? c.totalLt.toFixed(1) : "—"}</td>
+                          <td style={{ padding: "8px 10px", fontWeight: 700, color: "#10b981" }}>{c.grossSalary.toFixed(3)}</td>
+                          <td style={{ padding: "8px 10px", color: "#ef4444" }}>{c.advances > 0 ? c.advances.toFixed(3) : "—"}</td>
+                          <td style={{ padding: "8px 10px", fontWeight: 800, color: "#0f172a" }}>{c.netSalary.toFixed(3)}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#0f172a", color: "#fff", fontWeight: 700 }}>
+                        <td colSpan={4} style={{ padding: "10px" }}>TOTAL ({rows.length})</td>
+                        <td style={{ padding: "10px" }}>{sumDays.toFixed(2)}</td>
+                        <td style={{ padding: "10px" }}>{sumOt.toFixed(1)}</td>
+                        <td style={{ padding: "10px" }}></td>
+                        <td style={{ padding: "10px", color: "#6ee7b7" }}>{sumGross.toFixed(3)}</td>
+                        <td style={{ padding: "10px", color: "#fca5a5" }}>{sumAdv.toFixed(3)}</td>
+                        <td style={{ padding: "10px", color: "#93c5fd" }}>{sumNet.toFixed(3)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+
+                {salaryView === "detail" && rows.map(({ emp, c }) => (
+                  <div key={emp.id} style={{ marginBottom: 18, border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", pageBreakInside: "avoid" }}>
+                    <div style={{ background: "#0f172a", color: "#fff", padding: "10px 14px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14 }}>{emp.name}</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{emp.role || "—"} · {emp.emp_group || "Group 1"} · {emp.staff_type || "Own Staff"}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{period.label}</div>
+                        <div style={{ fontWeight: 800, fontSize: 16, color: "#93c5fd" }}>Net OMR {c.netSalary.toFixed(3)}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, background: "#f8fafc" }}>
+                      {[
+                        ["Daily / Monthly rate", c.isFixed ? `OMR ${c.dailyRate.toFixed(3)} / month` : `OMR ${c.dailyRate.toFixed(3)} / day`],
+                        ["Hourly", c.isFixed ? "—" : `OMR ${c.hourlyRate.toFixed(4)}`],
+                        ["Days / Hours", c.isFixed ? "Fixed (no attendance)" : `${c.totalDays.toFixed(2)} d · ${c.totalHours.toFixed(1)} h`],
+                        ["OT / LT", c.isFixed ? "—" : `OT ${c.totalOt.toFixed(1)} h · LT ${c.totalLt.toFixed(1)} h`],
+                        ["Gross", `OMR ${c.grossSalary.toFixed(3)}`],
+                        ["Advances in period", `OMR ${c.advances.toFixed(3)}`],
+                        ["Net payable", `OMR ${c.netSalary.toFixed(3)}`],
+                        ["Status", emp.status || "Active"],
+                      ].map(([l, v]) => (
+                        <div key={l} style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0" }}>
+                          <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{l}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginTop: 2 }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {rows.length === 0 && (
+                  <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>No employees to show for this selection.</div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* PAYMENTS */}
           {activeTab === "payments" && (
