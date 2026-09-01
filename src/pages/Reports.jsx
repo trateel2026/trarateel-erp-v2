@@ -376,7 +376,7 @@ export default function Reports() {
               const day = attDay || new Date().toISOString().split("T")[0];
               const dayStart = startDate || day;
               const dayEnd = endDate || startDate || day;
-              const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
+              const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive" && (e.staff_type || "") !== "Fixed Monthly");
               rows = [];
               const dates = [];
               {
@@ -1200,7 +1200,7 @@ export default function Reports() {
             const today = new Date().toISOString().split("T")[0];
             const dayStart = startDate || attDay || today;
             const dayEnd = endDate || (startDate ? startDate : (attDay || today));
-            const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive");
+            const activeEmps = employees.filter(e => (e.status || "Active") !== "Inactive" && (e.staff_type || "") !== "Fixed Monthly");
             const viewDates = [];
             {
               const cur = parseYMD(dayStart);
