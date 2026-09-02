@@ -8,6 +8,20 @@ import { getGroups, saveGroups } from "../lib/groups";
 
 const WORK_HOURS = 10;
 
+function getAdvanceWindow(period) {
+  const [y, m] = period.end.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  const mm = String(m).padStart(2, "0");
+  return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(last).padStart(2, "0")}` };
+}
+function getNextSalaryPeriod(period) {
+  const [y, m0] = period.start.split("-").map(Number);
+  let yy = y, mm = m0 + 1;
+  if (mm > 12) { mm = 1; yy += 1; }
+  return getPeriodDates(yy, mm - 1);
+}
+
+
 function getPeriodDates(year, month) {
   const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const nm = month === 11 ? 0 : month + 1;
@@ -81,8 +95,17 @@ function getPeriodDays(period) {
 }
 
 function printPayslip(emp, calc, period, co = {}) {
+  const advWin = calc.advWin || getAdvanceWindow(period);
+  const lines = calc.paymentLines || [];
+  const linesHtml = lines.length
+    ? lines.map(l => `<div class="row"><span>${l.date} · ${l.type}</span><span>OMR ${Number(l.amount).toFixed(3)}</span></div>`).join("")
+    : `<div class="row"><span style="color:#94a3b8">No payments recorded</span><span>OMR 0.000</span></div>`;
+  const daysLine = calc.isFixedMonthly
+    ? `<div class="row"><span>Working days</span><span style="font-weight:600">Fixed monthly</span></div>`
+    : `<div class="row"><span>Working days</span><span style="font-weight:600">${calc.totalDays} days</span></div>
+    <div class="row"><span>Overtime</span><span style="font-weight:600">${(calc.totalOt || 0) > 0 ? (calc.totalOt + " hrs") : "—"}</span></div>`;
   const w = window.open("", "_blank");
-  w.document.write(`<html><head><title>Payslip</title>
+  w.document.write(`<html><head><title>Payslip — ${emp.name}</title>
   <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;padding:28px;max-width:680px;margin:auto;color:#1e293b}
   .hdr{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:white;padding:20px 24px;border-radius:12px 12px 0 0}
   .bdy{border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:22px}
@@ -92,11 +115,12 @@ function printPayslip(emp, calc, period, co = {}) {
   .card{background:#f8fafc;padding:10px 14px;border-radius:8px}
   .sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:36px}
   .sigbox{border-top:2px solid #0f172a;padding-top:8px;text-align:center;font-size:12px;color:#64748b}
+  .note{font-size:11px;color:#64748b;margin-top:8px;line-height:1.45}
   @media print{button{display:none}}</style></head><body>
   <div class="hdr">
     <div style="display:flex;justify-content:space-between">
       <div>${co.company_logo ? `<img src="${co.company_logo}" style="height:36px;margin-bottom:6px;object-fit:contain"/>` : ""}
-        <div style="font-size:18px;font-weight:800">${co.company_name || "TRATEEL AL NAJAH CONSTRUCTION"}</div>
+        <div style="font-size:18px;font-weight:800">${co.company_name || "TRATEEL AL NAJAH FOR TRADING"}</div>
         <div style="font-size:11px;color:#94a3b8">${co.company_address || "Oman"} | ${co.company_phone || "+968 XXXX XXXX"}</div>
       </div>
       <div style="text-align:right">
@@ -107,25 +131,24 @@ function printPayslip(emp, calc, period, co = {}) {
     </div>
   </div>
   <div class="bdy">
-    <div style="font-size:11px;color:#64748b;font-weight:700;margin-bottom:8px">EMPLOYEE</div>
+    <div class="note"><b>Salary period:</b> ${period.start} → ${period.end} (26th to 25th)<br/>
+    <b>Advances window:</b> ${advWin.start} → ${advWin.end} (1st to last day of ending month)</div>
+    <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">EMPLOYEE</div>
     <div class="grid">
       <div class="card"><div style="font-size:10px;color:#64748b">Name</div><div style="font-weight:700">${emp.name}</div></div>
       <div class="card"><div style="font-size:10px;color:#64748b">Designation</div><div style="font-weight:700">${emp.role || "—"}</div></div>
       <div class="card"><div style="font-size:10px;color:#64748b">Group</div><div style="font-weight:700">${emp.emp_group || "Group 1"}</div></div>
-      <div class="card"><div style="font-size:10px;color:#64748b">Daily Rate</div><div style="font-weight:700;color:#6366f1">OMR ${parseFloat(emp.daily_rate || 0).toFixed(3)}</div></div>
+      <div class="card"><div style="font-size:10px;color:#64748b">Type</div><div style="font-weight:700">${emp.staff_type || "Own Staff"}</div></div>
     </div>
-    <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">EARNINGS & DEDUCTIONS</div>
-    <div class="row"><span>Days Worked</span><span style="font-weight:600">${calc.totalDays} days (${calc.totalHours} hrs)</span></div>
+    <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">WORK & EARNINGS</div>
+    ${daysLine}
     <div class="row"><span>Gross Salary</span><span style="font-weight:700;color:#6366f1">OMR ${calc.grossSalary.toFixed(3)}</span></div>
-    <div class="row"><span style="color:#ef4444">Advance Paid</span><span style="color:#ef4444">OMR ${(calc.paidAdvance||0).toFixed(3)}</span></div>
-    <div class="row"><span style="color:#ef4444">(-) Food</span><span style="color:#ef4444">OMR ${calc.food.toFixed(3)}</span></div>
-    <div class="row"><span style="color:#ef4444">(-) Other</span><span style="color:#ef4444">OMR ${calc.other.toFixed(3)}</span></div>
-    <div class="row"><span style="color:#10b981">(+) Incentive</span><span style="color:#10b981">OMR ${calc.incentive.toFixed(3)}</span></div>
-    <div class="total"><span style="font-weight:700">NET SALARY PAYABLE</span><span style="font-weight:900;color:#60a5fa;font-size:18px">OMR ${calc.netSalary.toFixed(3)}</span></div>
-    <div class="row"><span>Total Paid</span><span style="color:#10b981;font-weight:700">OMR ${calc.paidAmt.toFixed(3)}</span></div>
-    <div class="row"><span>Balance</span><span style="color:${calc.balance > 0 ? "#f59e0b" : "#10b981"};font-weight:700">OMR ${calc.balance.toFixed(3)}</span></div>
+    <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">PAYMENTS (with date)</div>
+    ${linesHtml}
+    <div class="row"><span style="font-weight:700">Total Paid</span><span style="color:#10b981;font-weight:700">OMR ${(calc.paidAmt||0).toFixed(3)}</span></div>
+    <div class="total"><span style="font-weight:700">BALANCE</span><span style="font-weight:900;color:${calc.balance > 0.001 ? "#fbbf24" : "#86efac"};font-size:18px">OMR ${calc.balance.toFixed(3)}</span></div>
     <div class="sig">
-      <div class="sigbox"><div style="height:48px"></div>Authorized Signature<br>${co.company_name || "TRATEEL AL NAJAH"}</div>
+      <div class="sigbox"><div style="height:48px"></div>Authorized Signature<br>${co.company_name || "TRATEEL AL NAJAH FOR TRADING"}</div>
       <div class="sigbox"><div style="height:48px"></div>Employee Signature<br>${emp.name}</div>
     </div>
   </div>
@@ -559,20 +582,40 @@ export default function Payroll() {
     // Use autoCarry when there is any prior attendance; otherwise use seedBal.
     const openingBal = priorHours > 0 || priorPaid > 0 ? autoCarry : seedBal;
     const netSalary = parseFloat((grossSalary - advance - food - other + incentive).toFixed(3));
-    // Match payments by payroll_id OR by unlinked payment within the period
+    // Advances = calendar month of period.end (1st→last). Salary type = period.start through next period end.
     const empPayments = empPaymentsAll;
-    const periodPayments = empPayments.filter(p => {
-      if (pr && p.payroll_id === pr.id) return true;
-      if (!p.payroll_id && p.payment_date >= selectedPeriod.start && p.payment_date <= selectedPeriod.end) return true;
-      return false;
-    });
-    const finalPayments = periodPayments.length > 0 ? periodPayments : empPayments.filter(p => !p.payroll_id && p.payment_date >= selectedPeriod.start && p.payment_date <= selectedPeriod.end);
-    const paidAmt = finalPayments.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
-    const paidAdvance = finalPayments.filter(p => p.payment_type === "Advance").reduce((s, p) => s + parseFloat(p.amount || 0), 0);
-    const paidSalary = finalPayments.filter(p => p.payment_type !== "Advance").reduce((s, p) => s + parseFloat(p.amount || 0), 0);
-    // Total balance = this period net + carried previous arrears − paid this period
+    const advWin = getAdvanceWindow(selectedPeriod);
+    const nextP = getNextSalaryPeriod(selectedPeriod);
+    const isSalary = (p) => String(p.payment_type || "").toLowerCase() === "salary";
+    const advancePays = empPayments.filter(p => !isSalary(p) && p.payment_date >= advWin.start && p.payment_date <= advWin.end);
+    const salaryPays = empPayments.filter(p => isSalary(p) && p.payment_date >= selectedPeriod.start && p.payment_date <= nextP.end);
+    // Also include payroll_id-linked non-salary within advance window if type missing
+    const linked = pr ? empPayments.filter(p => p.payroll_id === pr.id && !advancePays.includes(p) && !salaryPays.includes(p)) : [];
+    const finalPayments = [...advancePays, ...salaryPays, ...linked.filter(p => {
+      const d = p.payment_date || "";
+      return (d >= advWin.start && d <= advWin.end) || (isSalary(p) && d >= selectedPeriod.start && d <= nextP.end);
+    })];
+    // dedupe by id
+    const seen = new Set();
+    const uniq = [];
+    for (const p of finalPayments) {
+      const id = p.id || (p.payment_date + p.amount + p.payment_type);
+      if (seen.has(id)) continue;
+      seen.add(id); uniq.push(p);
+    }
+    const paidAmt = uniq.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    const paidAdvance = uniq.filter(p => !isSalary(p)).reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    const paidSalary = uniq.filter(p => isSalary(p)).reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    const paymentLines = uniq
+      .slice()
+      .sort((a, b) => (a.payment_date || "").localeCompare(b.payment_date || ""))
+      .map(p => ({
+        date: p.payment_date,
+        type: isSalary(p) ? "Salary" : (p.payment_type || "Advance"),
+        amount: parseFloat(p.amount || 0),
+      }));
     const balance = parseFloat((netSalary + openingBal - paidAmt).toFixed(3));
-    return { totalHours, totalDays, totalOt, totalLt, grossSalary, advance, food, other, incentive, netSalary, openingBal, paidAmt, paidAdvance, paidSalary, balance, payrollRecord: pr };
+    return { totalHours, totalDays, totalOt, totalLt, grossSalary, advance, food, other, incentive, netSalary, openingBal, paidAmt, paidAdvance, paidSalary, balance, payrollRecord: pr, paymentLines, advWin, isFixedMonthly: (emp.staff_type || "") === "Fixed Monthly" };
   };
 
   const saveEmployee = async (formData) => {
