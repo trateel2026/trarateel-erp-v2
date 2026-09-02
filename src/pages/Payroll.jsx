@@ -140,9 +140,10 @@ function printPayslip(emp, calc, period, co = {}) {
       <div class="card"><div style="font-size:10px;color:#64748b">Group</div><div style="font-weight:700">${emp.emp_group || "Group 1"}</div></div>
       <div class="card"><div style="font-size:10px;color:#64748b">Type</div><div style="font-weight:700">${emp.staff_type || "Own Staff"}</div></div>
     </div>
+    <div class="row" style="margin-top:10px"><span style="font-weight:700">Monthly salary (agreed)</span><span style="font-weight:800;color:#0f172a">OMR ${Number(calc.monthlyPackage != null ? calc.monthlyPackage : (calc.isFixedMonthly ? parseFloat(emp.daily_rate||0) : parseFloat(emp.daily_rate||0)*26)).toFixed(3)}</span></div>
     <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">WORK & EARNINGS</div>
     ${daysLine}
-    <div class="row"><span>Gross Salary</span><span style="font-weight:700;color:#6366f1">OMR ${calc.grossSalary.toFixed(3)}</span></div>
+    <div class="row"><span>Gross Salary (this period)</span><span style="font-weight:700;color:#6366f1">OMR ${calc.grossSalary.toFixed(3)}</span></div>
     <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">PAYMENTS (with date)</div>
     ${linesHtml}
     <div class="row"><span style="font-weight:700">Total Paid</span><span style="color:#10b981;font-weight:700">OMR ${(calc.paidAmt||0).toFixed(3)}</span></div>
@@ -551,6 +552,10 @@ export default function Payroll() {
     const grossSalary = isFixedMonthly
       ? parseFloat(dailyRate.toFixed(3))
       : parseFloat((dailyRate * totalDays).toFixed(3));
+    // Agreed monthly package shown on payslip (26 working-day basis for rate staff)
+    const monthlyPackage = isFixedMonthly
+      ? parseFloat(dailyRate.toFixed(3))
+      : parseFloat((dailyRate * 26).toFixed(3));
     const pr = payrollRecords.find(p => p.employee_id === emp.id && p.period_start === selectedPeriod.start);
     const df = deductForms[emp.id] || {};
     const advance = pr ? parseFloat(pr.advance_deduction || 0) : parseFloat(df.advance || 0);
@@ -615,7 +620,7 @@ export default function Payroll() {
         amount: parseFloat(p.amount || 0),
       }));
     const balance = parseFloat((netSalary + openingBal - paidAmt).toFixed(3));
-    return { totalHours, totalDays, totalOt, totalLt, grossSalary, advance, food, other, incentive, netSalary, openingBal, paidAmt, paidAdvance, paidSalary, balance, payrollRecord: pr, paymentLines, advWin, isFixedMonthly: (emp.staff_type || "") === "Fixed Monthly" };
+    return { totalHours, totalDays, totalOt, totalLt, grossSalary, monthlyPackage, advance, food, other, incentive, netSalary, openingBal, paidAmt, paidAdvance, paidSalary, balance, payrollRecord: pr, paymentLines, advWin, isFixedMonthly: (emp.staff_type || "") === "Fixed Monthly" };
   };
 
   const saveEmployee = async (formData) => {
