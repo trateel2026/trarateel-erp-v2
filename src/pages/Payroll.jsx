@@ -9,10 +9,8 @@ import { getGroups, saveGroups } from "../lib/groups";
 const WORK_HOURS = 10;
 
 function getAdvanceWindow(period) {
-  const [y, m] = period.end.split("-").map(Number);
-  const last = new Date(y, m, 0).getDate();
-  const mm = String(m).padStart(2, "0");
-  return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(last).padStart(2, "0")}` };
+  // Same dates as salary period (26th → 25th) — one window, less confusion
+  return { start: period.start, end: period.end };
 }
 function getNextSalaryPeriod(period) {
   const [y, m0] = period.start.split("-").map(Number);
@@ -132,7 +130,7 @@ function printPayslip(emp, calc, period, co = {}) {
   </div>
   <div class="bdy">
     <div class="note"><b>Salary period:</b> ${period.start} → ${period.end} (26th to 25th)<br/>
-    <b>Advances window:</b> ${advWin.start} → ${advWin.end} (1st to last day of ending month)</div>
+    <b>Advances / other in this period:</b> ${advWin.start} → ${advWin.end} (same as salary period)</div>
     <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">EMPLOYEE</div>
     <div class="grid">
       <div class="card"><div style="font-size:10px;color:#64748b">Name</div><div style="font-weight:700">${emp.name}</div></div>
@@ -140,7 +138,7 @@ function printPayslip(emp, calc, period, co = {}) {
       <div class="card"><div style="font-size:10px;color:#64748b">Group</div><div style="font-weight:700">${emp.emp_group || "Group 1"}</div></div>
       <div class="card"><div style="font-size:10px;color:#64748b">Type</div><div style="font-weight:700">${emp.staff_type || "Own Staff"}</div></div>
     </div>
-    <div class="row" style="margin-top:10px"><span style="font-weight:700">Monthly salary (agreed)</span><span style="font-weight:800;color:#0f172a">OMR ${Number(calc.monthlyPackage != null ? calc.monthlyPackage : (calc.isFixedMonthly ? parseFloat(emp.daily_rate||0) : parseFloat(emp.daily_rate||0)*26)).toFixed(3)}</span></div>
+    <div class="row" style="margin-top:10px"><span style="font-weight:700">Monthly salary (agreed)</span><span style="font-weight:800;color:#0f172a">${calc.monthlyPackageLabel || ("OMR " + Number(calc.monthlyPackage != null ? calc.monthlyPackage : 0).toFixed(3))}</span></div>
     <div style="font-size:11px;color:#64748b;font-weight:700;margin:14px 0 8px">WORK & EARNINGS</div>
     ${daysLine}
     <div class="row"><span>Gross Salary (this period)</span><span style="font-weight:700;color:#6366f1">OMR ${calc.grossSalary.toFixed(3)}</span></div>
@@ -556,6 +554,13 @@ export default function Payroll() {
     const monthlyPackage = isFixedMonthly
       ? parseFloat(dailyRate.toFixed(3))
       : parseFloat((dailyRate * 26).toFixed(3));
+    // Show base + food where package is 145 (125+20) or 270 (250+20)
+    let monthlyPackageLabel = `OMR ${monthlyPackage.toFixed(3)}`;
+    if (!isFixedMonthly) {
+      const pkg = Math.round(monthlyPackage * 1000) / 1000;
+      if (Math.abs(pkg - 145) < 0.05) monthlyPackageLabel = `OMR 145.000 (125 + 20 food)`;
+      else if (Math.abs(pkg - 270) < 0.05) monthlyPackageLabel = `OMR 270.000 (250 + 20 food)`;
+    }
     const pr = payrollRecords.find(p => p.employee_id === emp.id && p.period_start === selectedPeriod.start);
     const df = deductForms[emp.id] || {};
     const advance = pr ? parseFloat(pr.advance_deduction || 0) : parseFloat(df.advance || 0);
@@ -620,7 +625,7 @@ export default function Payroll() {
         amount: parseFloat(p.amount || 0),
       }));
     const balance = parseFloat((netSalary + openingBal - paidAmt).toFixed(3));
-    return { totalHours, totalDays, totalOt, totalLt, grossSalary, monthlyPackage, advance, food, other, incentive, netSalary, openingBal, paidAmt, paidAdvance, paidSalary, balance, payrollRecord: pr, paymentLines, advWin, isFixedMonthly: (emp.staff_type || "") === "Fixed Monthly" };
+    return { totalHours, totalDays, totalOt, totalLt, grossSalary, monthlyPackage, monthlyPackageLabel, advance, food, other, incentive, netSalary, openingBal, paidAmt, paidAdvance, paidSalary, balance, payrollRecord: pr, paymentLines, advWin, isFixedMonthly: (emp.staff_type || "") === "Fixed Monthly" };
   };
 
   const saveEmployee = async (formData) => {

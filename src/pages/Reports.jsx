@@ -34,10 +34,8 @@ function getSalaryPeriods() {
   return out;
 }
 function getAdvanceWindow(period) {
-  const [y, m] = period.end.split("-").map(Number);
-  const last = new Date(y, m, 0).getDate();
-  const mm = String(m).padStart(2, "0");
-  return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(last).padStart(2, "0")}` };
+  // Same dates as salary period (26th → 25th)
+  return { start: period.start, end: period.end };
 }
 function getNextSalaryPeriod(period) {
   const [y, m0] = period.start.split("-").map(Number);
@@ -369,7 +367,7 @@ export default function Reports() {
                 return {
                   "Period": period.label,
                   "Salary period (26→25)": period.start + " to " + period.end,
-                  "Advances window (1→month-end)": c.advWin.start + " to " + c.advWin.end,
+                  "Advances window (same as period)": c.advWin.start + " to " + c.advWin.end,
                   "Employee": emp.name,
                   "Role": emp.role || "",
                   "Working days": c.isFixed ? "Fixed" : c.totalDays,
@@ -1078,7 +1076,7 @@ export default function Reports() {
                   <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Salary Report — {period.label}</div>
                   <div style={{ fontSize: 12, color: "#475569", marginTop: 4, lineHeight: 1.55 }}>
                     <b>Salary period:</b> {period.start} → {period.end} <span style={{ color: "#64748b" }}>(26th of the month to 25th of the next month)</span><br/>
-                    <b>Advances / other allowances:</b> {advWin.start} → {advWin.end} <span style={{ color: "#64748b" }}>(1st to last day of the period’s ending month only)</span>
+                    <b>Advances / other in this period:</b> {advWin.start} → {advWin.end} <span style={{ color: "#64748b" }}>(same window as salary period — 26th to 25th)</span>
                   </div>
                 </div>
 
@@ -1163,7 +1161,7 @@ export default function Reports() {
                       ))}
                     </div>
                     <div style={{ padding: "8px 12px", fontSize: 10, color: "#64748b", background: "#fff" }}>
-                      Salary period: {period.start} → {period.end} (26→25) · Advances: {c.advWin.start} → {c.advWin.end} (1→month-end)
+                      Salary period & advances: {period.start} → {period.end} (26→25)
                     </div>
                   </div>
                 ))}
