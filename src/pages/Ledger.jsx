@@ -192,16 +192,21 @@ export default function Ledger() {
     (e.bank_account_id && trackingOnlyIds.has(e.bank_account_id));
   const visibleEntries = entries.filter(e => !isTrackingOnly(e));
 
-  const filtered = visibleEntries.filter(e =>
-    (filter === "All double entries" || e.type === filter) &&
-    (catFilter === "All Categories" || e.category === catFilter) &&
-    (e.description?.toLowerCase().includes(search.toLowerCase()) ||
-     e.payee?.toLowerCase().includes(search.toLowerCase()) ||
-     e.ref_voucher?.toLowerCase().includes(search.toLowerCase()) ||
-     e.site?.toLowerCase().includes(search.toLowerCase()) ||
-     e.remarks?.toLowerCase().includes(search.toLowerCase())) &&
-    (!startDate || e.entry_date >= startDate) && (!endDate || e.entry_date <= endDate)
-  );
+  const q = (search || "").trim().toLowerCase();
+  const filtered = visibleEntries.filter(e => {
+    if (filter !== "All double entries" && e.type !== filter) return false;
+    if (catFilter !== "All Categories" && e.category !== catFilter) return false;
+    if (startDate && e.entry_date < startDate) return false;
+    if (endDate && e.entry_date > endDate) return false;
+    if (!q) return true;
+    const hay = [
+      e.description, e.payee, e.ref_voucher, e.site, e.remarks,
+      e.category, e.payment_mode, e.type, e.entry_date,
+      e.amount != null ? String(e.amount) : "",
+    ].map(x => (x || "").toLowerCase()).join(" ");
+    // every word in query must match somewhere (e.g. "petrol shell")
+    return q.split(/\s+/).every(w => hay.includes(w));
+  });
 
   const totalIncome = visibleEntries.filter(e => e.type === "Credits (Income)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
   const totalExpense = visibleEntries.filter(e => e.type === "Debits (Payouts)").reduce((s, e) => s + parseFloat(e.amount || 0), 0);
@@ -282,7 +287,39 @@ export default function Ledger() {
         )}
       </div>
 
-      {/* Entry Form */}
+      
+      {/* Sticky search — always visible on mobile & desktop */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 40, marginBottom: 14,
+        background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0",
+        padding: "10px 12px", boxShadow: "0 1px 4px rgba(15,23,42,0.06)",
+      }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>🔍</span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search transactions… e.g. petrol, gloves, Diluar"
+            style={{
+              flex: 1, minWidth: 0, border: "1px solid #e2e8f0", borderRadius: 10,
+              padding: "12px 14px", fontSize: 15, outline: "none", background: "#f8fafc",
+            }}
+          />
+          {search ? (
+            <button type="button" onClick={() => setSearch("")}
+              style={{ border: "none", background: "#f1f5f9", color: "#64748b", borderRadius: 8, padding: "10px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>
+              Clear
+            </button>
+          ) : null}
+        </div>
+        {search ? (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
+            Showing <b style={{ color: "#0f172a" }}>{filtered.length}</b> match{filtered.length === 1 ? "" : "es"} for “{search}” · newest first
+          </div>
+        ) : null}
+      </div>
+
+{/* Entry Form */}
       {showForm && isAdmin && (
         <EntryForm
           onSave={handleSave}
@@ -342,8 +379,6 @@ export default function Ledger() {
       {/* Table */}
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
         <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search description, payee, site, remarks..."
-            style={{ flex: 1, minWidth: 200, border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 12, outline: "none" }} />
           {["All double entries","Credits (Income)","Debits (Payouts)"].map(f => (
             <button key={f} onClick={() => setFilter(f)} style={{ padding: "7px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: filter===f?"#0f172a":"#f1f5f9", color: filter===f?"#fff":"#64748b" }}>{f}</button>
           ))}
