@@ -4,7 +4,31 @@ import { getBankAccounts } from "../lib/bankAccounts";
 import { supabase } from "../lib/supabase";
 import { useAdmin } from "../context/AdminContext";
 
-const cats = ["Project Payment","Materials","Payroll","Equipment","Subcontractor","Commission","Transport","Fund Received","Supplier Payment","Miscellaneous"];
+const cats = [
+  "Project Payment",
+  "Materials",
+  "Payroll",
+  "Equipment",
+  "Tools / Equipment",
+  "Subcontractor",
+  "Commission",
+  "Profit Percentage",
+  "Transport",
+  "Fuel",
+  "Food / Refreshments",
+  "Fund Received",
+  "Account Transfer",
+  "Supplier Payment",
+  "Visa / Immigration",
+  "Visa / Travel",
+  "Travel",
+  "Insurance",
+  "Equipment Rental",
+  "Site Amenities",
+  "Vehicle",
+  "Office / Stationery",
+  "Miscellaneous",
+];
 const defaultPayModes = ["Cash","Bank Transfer","Cheque","Online","Credit Purchase"];
 const emptyForm = () => ({ entry_date: new Date().toISOString().split("T")[0], description: "", payee: "", type: "Debits (Payouts)", category: "Miscellaneous", amount: "", ref_voucher: "", site: "", remarks: "", payment_mode: "Cash", bank_account_id: "" });
 
