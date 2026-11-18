@@ -18,6 +18,8 @@ const MaterialRequests = lazy(() => import("./pages/MaterialRequests"));
 const Equipment = lazy(() => import("./pages/Equipment"));
 import EmployeeApp from "./pages/Attendance";
 import HelpBot from "./components/HelpBot";
+import { SubscriptionDialog, SubscriptionLockScreen } from "./components/SubscriptionGate";
+import { getPaidUntil, isSubscriptionActive, isPageLocked } from "./lib/subscription";
 
 const nav = [
   { section: "MAIN OPERATIONS" },
@@ -45,6 +47,10 @@ function AppContent() {
   const [page, setPage] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isAdmin, currentUser, loggedIn, initialLoading, setShowLogin, logout, canView } = useAdmin();
+  const [subPaidUntil, setSubPaidUntil] = useState(null);
+  const [subLoaded, setSubLoaded] = useState(false);
+  const [showSubDialog, setShowSubDialog] = useState(false);
+  const [remindLater, setRemindLater] = useState(() => sessionStorage.getItem("minarva_sub_remind") === "1");
 
   // Check if this is the employee field app
   const [isFieldApp, setIsFieldApp] = useState(() => {
@@ -63,6 +69,30 @@ function AppContent() {
     return () => window.removeEventListener("hashchange", checkField);
   }, []);
 
+  // Load subscription status after login
+  useEffect(() => {
+    if (!loggedIn) {
+      setSubLoaded(false);
+      setShowSubDialog(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const until = await getPaidUntil();
+      if (cancelled) return;
+      setSubPaidUntil(until);
+      setSubLoaded(true);
+      const paid = isSubscriptionActive(until);
+      const reminded = sessionStorage.getItem("minarva_sub_remind") === "1";
+      setRemindLater(reminded);
+      if (!paid && !reminded) setShowSubDialog(true);
+      else setShowSubDialog(false);
+    })();
+    return () => { cancelled = true; };
+  }, [loggedIn]);
+
+  const isPaid = isSubscriptionActive(subPaidUntil);
+
   // If employee field app mode → show employee app directly (no login needed)
   if (isFieldApp) {
     return <EmployeeApp onExitFieldMode={() => { setIsFieldApp(false); window.location.hash = ""; }} />;
@@ -78,7 +108,22 @@ function AppContent() {
     return <LoginScreen />;
   }
 
+  const pageLabels = {
+    payroll: "Payroll & Attendance",
+    ledger: "Cashbook Ledger",
+    settings: "Settings & Backups",
+    reports: "Reports & Audits",
+  };
+
   const renderPage = () => {
+    if (subLoaded && isPageLocked(page, { isPaid, isAdmin })) {
+      return (
+        <SubscriptionLockScreen
+          pageLabel={pageLabels[page] || page}
+          onPay={() => setShowSubDialog(true)}
+        />
+      );
+    }
     switch (page) {
       case "dashboard": return <Dashboard setPage={setPage} />;
       case "projects": return <Projects />;
@@ -93,7 +138,14 @@ function AppContent() {
       case "inventory": return <Inventory />;
       case "material_requests": return <MaterialRequests />;
       case "equipment": return <Equipment />;
-      case "settings": return <Settings />;
+      case "settings": return <Settings onSubscriptionUpdated={(until) => {
+        setSubPaidUntil(until);
+        if (isSubscriptionActive(until)) {
+          setShowSubDialog(false);
+          sessionStorage.removeItem("minarva_sub_remind");
+          setRemindLater(false);
+        }
+      }} />;
       default: return <Dashboard setPage={setPage} />;
     }
   };
@@ -195,6 +247,15 @@ function AppContent() {
           </div>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>
+          {!isPaid && subLoaded && (
+            <div style={{ background: "#fffbeb", borderBottom: "1px solid #fcd34d", padding: "8px 16px", fontSize: 12, color: "#92400e", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+              <span>⚠ Software subscription pending · Pay via PayPal · Confirm at minarvabiz@gmail.com</span>
+              <button type="button" onClick={() => setShowSubDialog(true)}
+                style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                Pay now
+              </button>
+            </div>
+          )}
           <ErrorBoundary key={page}>
             <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>Loading...</div>}>
               {renderPage()}
@@ -203,6 +264,15 @@ function AppContent() {
         </div>
       </div>
       <HelpBot />
+      {showSubDialog && !isPaid && (
+        <SubscriptionDialog
+          onRemindLater={() => {
+            sessionStorage.setItem("minarva_sub_remind", "1");
+            setRemindLater(true);
+            setShowSubDialog(false);
+          }}
+        />
+      )}
     </div>
   );
 }

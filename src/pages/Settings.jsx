@@ -3,6 +3,7 @@ import { getBankAccounts, setOpeningBalance } from "../lib/bankAccounts";
 import { supabase } from "../lib/supabase";
 import { useAdmin } from "../context/AdminContext";
 import { ALL_PAGES, ROLE_PRESETS, FULL_PERMS } from "../context/AdminContext";
+import { getPaidUntil, setPaidUntil, isSubscriptionActive, defaultEndDate, PAYPAL_LINKS } from "../lib/subscription";
 
 const COMPANY_FIELDS = [
   { key:"company_name", label:"Company Name (English)", placeholder:"TRATEEL AL NAJAH FOR TRADING", col:2 },
@@ -20,7 +21,7 @@ const COMPANY_FIELDS = [
   { key:"company_bank", label:"Bank Name & Branch", placeholder:"Bank Muscat, Barka Branch" },
 ];
 
-export default function Settings() {
+export default function Settings({ onSubscriptionUpdated }) {
   const { isAdmin, canView, setShowLogin } = useAdmin();
   const [settings, setSettings] = useState({});
   const [saving, setSaving] = useState({});
@@ -34,8 +35,16 @@ export default function Settings() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [editingBank, setEditingBank] = useState(null);
+  const [paidUntil, setPaidUntilState] = useState("");
+  const [subSaving, setSubSaving] = useState(false);
 
-  useEffect(() => { if (isAdmin) { load(); getBankAccounts().then(setBankAccounts); } }, [isAdmin]);
+  useEffect(() => {
+    if (isAdmin) {
+      load();
+      getBankAccounts().then(setBankAccounts);
+      getPaidUntil().then((v) => setPaidUntilState(v || ""));
+    }
+  }, [isAdmin]);
 
   const load = async () => {
     const { data } = await supabase.from("app_settings").select("*");
@@ -158,6 +167,19 @@ export default function Settings() {
     </button>
   );
 
+  const saveSubscription = async (dateStr) => {
+    setSubSaving(true);
+    try {
+      await setPaidUntil(dateStr);
+      setPaidUntilState(dateStr);
+      if (onSubscriptionUpdated) onSubscriptionUpdated(dateStr);
+      showMsg(dateStr ? `✅ Subscription active until ${dateStr}` : "✅ Subscription cleared (unpaid)");
+    } catch (e) {
+      showMsg("❌ " + (e.message || "Failed to save"), "error");
+    }
+    setSubSaving(false);
+  };
+
   return (
     <div style={{padding:24}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
@@ -168,7 +190,43 @@ export default function Settings() {
         {msg.text&&<div style={{background:msg.type==="error"?"#fef2f2":"#ecfdf5",color:msg.type==="error"?"#dc2626":"#10b981",borderRadius:8,padding:"10px 18px",fontSize:13,fontWeight:600}}>{msg.text}</div>}
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr",gap:20}}>
+      {/* Software subscription — Admin only */}
+      <Card title="💳 Minarva Biz — Software Subscription">
+        <div style={{fontSize:13,color:"#475569",marginBottom:12,lineHeight:1.5}}>
+          Status:{" "}
+          <strong style={{color: isSubscriptionActive(paidUntil) ? "#059669" : "#dc2626"}}>
+            {isSubscriptionActive(paidUntil) ? `Paid until ${paidUntil}` : "Payment pending"}
+          </strong>
+        </div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:12,lineHeight:1.5}}>
+          After customer pays via PayPal, confirm the email at <strong>minarvabiz@gmail.com</strong>, then set the end date below (or use quick buttons).
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12,alignItems:"center"}}>
+          <input type="date" value={paidUntil || ""} onChange={(e)=>setPaidUntilState(e.target.value)}
+            style={{border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 12px",fontSize:13}} />
+          <button type="button" disabled={subSaving} onClick={()=>saveSubscription(paidUntil)}
+            style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            {subSaving ? "..." : "Save paid-until date"}
+          </button>
+          <button type="button" disabled={subSaving} onClick={()=>saveSubscription(defaultEndDate("sixMonths"))}
+            style={{background:"#2563eb",color:"#fff",border:"none",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+            Mark 6 months paid
+          </button>
+          <button type="button" disabled={subSaving} onClick={()=>saveSubscription(defaultEndDate("oneYear"))}
+            style={{background:"#0f172a",color:"#fff",border:"none",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+            Mark 1 year paid
+          </button>
+          <button type="button" disabled={subSaving} onClick={()=>saveSubscription("")}
+            style={{background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+            Clear (unpaid)
+          </button>
+        </div>
+        <div style={{fontSize:11,color:"#94a3b8"}}>
+          PayPal links: 6 months ${PAYPAL_LINKS.sixMonths.priceUsd} · 1 year ${PAYPAL_LINKS.oneYear.priceUsd}
+        </div>
+      </Card>
+
+      <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr",gap:20,marginTop:20}}>
         <div>
           {/* Company Profile */}
           <Card title="🏢 Company Profile — TRATEEL AL NAJAH FOR TRADING">
