@@ -116,7 +116,7 @@ function AppContent() {
   };
 
   const renderPage = () => {
-    if (subLoaded && isPageLocked(page, { isPaid, isAdmin })) {
+    if (subLoaded && isPageLocked(page, { isPaid })) {
       return (
         <SubscriptionLockScreen
           pageLabel={pageLabels[page] || page}
@@ -138,14 +138,7 @@ function AppContent() {
       case "inventory": return <Inventory />;
       case "material_requests": return <MaterialRequests />;
       case "equipment": return <Equipment />;
-      case "settings": return <Settings onSubscriptionUpdated={(until) => {
-        setSubPaidUntil(until);
-        if (isSubscriptionActive(until)) {
-          setShowSubDialog(false);
-          sessionStorage.removeItem("minarva_sub_remind");
-          setRemindLater(false);
-        }
-      }} />;
+      case "settings": return <Settings />;
       default: return <Dashboard setPage={setPage} />;
     }
   };
@@ -270,6 +263,12 @@ function AppContent() {
             sessionStorage.setItem("minarva_sub_remind", "1");
             setRemindLater(true);
             setShowSubDialog(false);
+          }}
+          onUnlocked={(until) => {
+            setSubPaidUntil(until);
+            setShowSubDialog(false);
+            sessionStorage.removeItem("minarva_sub_remind");
+            setRemindLater(false);
           }}
         />
       )}

@@ -16,13 +16,15 @@ export const PAYPAL_LINKS = {
 };
 
 export const SUBSCRIPTION_KEY = "subscription_paid_until";
+/** Payroll, Cashbook, Settings, Reports locked when unpaid */
 export const LOCKED_PAGES = ["payroll", "ledger", "settings", "reports"];
 
-/** Pages locked for non-admin when subscription is unpaid */
-export function isPageLocked(pageId, { isPaid, isAdmin }) {
+/** SHA-256 of provider unlock codes (plain codes only with Minarva — not shown in UI) */
+const UNLOCK_HASH_6M = "58685e5afa011a18d2f950250e310bf4a349adcc5df95967400cd94ca71460f6";
+const UNLOCK_HASH_1Y = "808275cef777509f39c182b847e89bf863688ef99e192fe9f671ddc0649811c8";
+
+export function isPageLocked(pageId, { isPaid }) {
   if (isPaid) return false;
-  // Admin must reach Settings to mark paid
-  if (isAdmin && pageId === "settings") return false;
   return LOCKED_PAGES.includes(pageId);
 }
 
@@ -70,7 +72,6 @@ export async function setPaidUntil(dateStr) {
   return value;
 }
 
-/** Default end dates after marking a plan paid */
 export function defaultEndDate(plan) {
   const d = new Date();
   if (plan === "sixMonths") {
@@ -79,4 +80,28 @@ export function defaultEndDate(plan) {
     d.setFullYear(d.getFullYear() + 1);
   }
   return d.toISOString().slice(0, 10);
+}
+
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text.trim());
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Provider-only unlock. Returns { ok, plan, paidUntil } or { ok:false, error }.
+ */
+export async function tryProviderUnlock(code) {
+  if (!code || !String(code).trim()) {
+    return { ok: false, error: "Enter unlock code" };
+  }
+  const hash = await sha256Hex(String(code));
+  let plan = null;
+  if (hash === UNLOCK_HASH_6M) plan = "sixMonths";
+  else if (hash === UNLOCK_HASH_1Y) plan = "oneYear";
+  else return { ok: false, error: "Invalid unlock code" };
+
+  const paidUntil = defaultEndDate(plan);
+  await setPaidUntil(paidUntil);
+  return { ok: true, plan, paidUntil };
 }

@@ -1,4 +1,5 @@
-import { PAYPAL_LINKS } from "../lib/subscription";
+import { useState } from "react";
+import { PAYPAL_LINKS, tryProviderUnlock } from "../lib/subscription";
 
 const overlay = {
   position: "fixed",
@@ -31,9 +32,31 @@ const btnPrimary = {
   marginBottom: 10,
 };
 
-export function SubscriptionDialog({ onRemindLater }) {
+export function SubscriptionDialog({ onRemindLater, onUnlocked }) {
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
   const openPay = (url) => {
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const submitUnlock = async () => {
+    setErr("");
+    setBusy(true);
+    try {
+      const res = await tryProviderUnlock(code);
+      if (!res.ok) {
+        setErr(res.error || "Invalid code");
+        setBusy(false);
+        return;
+      }
+      if (onUnlocked) onUnlocked(res.paidUntil);
+    } catch (e) {
+      setErr(e.message || "Unlock failed");
+    }
+    setBusy(false);
   };
 
   return (
@@ -72,12 +95,46 @@ export function SubscriptionDialog({ onRemindLater }) {
         <button
           type="button"
           onClick={onRemindLater}
-          style={{ ...btnPrimary, background: "#f1f5f9", color: "#475569", marginBottom: 0 }}
+          style={{ ...btnPrimary, background: "#f1f5f9", color: "#475569" }}
         >
           Remind me later
         </button>
+
+        {!showUnlock ? (
+          <button
+            type="button"
+            onClick={() => setShowUnlock(true)}
+            style={{ ...btnPrimary, background: "transparent", color: "#94a3b8", marginBottom: 0, fontSize: 12, fontWeight: 600, padding: "8px" }}
+          >
+            Provider unlock (after payment confirmed)
+          </button>
+        ) : (
+          <div style={{ marginTop: 8, paddingTop: 12, borderTop: "1px solid #e2e8f0" }}>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
+              Unlock code (from Minarva Biz after payment is confirmed)
+            </div>
+            <input
+              type="password"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitUnlock()}
+              placeholder="Enter unlock code"
+              style={{ width: "100%", boxSizing: "border-box", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 12px", fontSize: 14, marginBottom: 8 }}
+            />
+            {err && <div style={{ color: "#dc2626", fontSize: 12, marginBottom: 8 }}>{err}</div>}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={submitUnlock}
+              style={{ ...btnPrimary, background: "#059669", color: "#fff", marginBottom: 0 }}
+            >
+              {busy ? "Unlocking…" : "Unlock subscription"}
+            </button>
+          </div>
+        )}
+
         <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 14, marginBottom: 0, lineHeight: 1.45 }}>
-          Payment opens PayPal (business name: Minarva Biz). After paying, send the receipt to minarvabiz@gmail.com — access is unlocked when payment is confirmed.
+          After paying, send the receipt to minarvabiz@gmail.com. Access is unlocked only after Minarva confirms payment.
         </p>
       </div>
     </div>
